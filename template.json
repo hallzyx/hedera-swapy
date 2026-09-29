@@ -1,0 +1,17 @@
+{
+  "name": "saucerswap-policy-swap",
+  "description": "Policy-gated HBAR→SAUCE swap on SaucerSwap V2 (Hedera testnet) with RainbowKit / wagmi",
+  "create-scaffold-hbar": {
+    "capabilities": {
+      "frontend": ["nextjs-app"],
+      "solidityFramework": ["hardhat"],
+      "packageManager": ["yarn"]
+    },
+    "defaults": {
+      "frontend": "nextjs-app",
+      "solidityFramework": "hardhat",
+      "packageManager": "yarn"
+    },
+    "outro": "No contract deploy required for the swap demo. Fund a Hedera testnet wallet, run yarn next:dev, then associate SAUCE and swap. Optional: SWAP_PRIVATE_KEY=... yarn demo:swap"
+  }
+}

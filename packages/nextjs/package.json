@@ -9,7 +9,11 @@
     "format": "prettier --write . '!(node_modules|.next|contracts)/**/*'",
     "lint": "next lint",
     "serve": "next start",
-    "start": "next dev"
+    "start": "next dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e:policy": "playwright test e2e/policy.spec.ts",
+    "e2e:synpress": "playwright test e2e/synpress.swap.spec.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.1.5",
@@ -36,6 +40,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.55.0",
     "@tailwindcss/postcss": "latest",
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",
     "@types/node": "^18.19.50",
@@ -49,7 +54,8 @@
     "prettier": "^3.5.3",
     "tailwindcss": "^4.1.3",
     "type-fest": "^4.26.1",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "vitest": "3.2.4"
   },
   "packageManager": "yarn@3.2.3"
 }

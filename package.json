@@ -1,7 +1,8 @@
 {
-  "name": "sh",
+  "name": "saucerswap-policy-swap",
   "version": "0.0.1",
   "private": true,
+  "license": "MIT",
   "workspaces": {
     "packages": [
       "packages/hardhat",
@@ -36,6 +37,10 @@
     "next:lint": "yarn workspace @sh/nextjs lint",
     "next:serve": "yarn workspace @sh/nextjs serve",
     "next:start": "yarn workspace @sh/nextjs start",
+    "next:test": "yarn workspace @sh/nextjs test",
+    "demo:swap": "node packages/nextjs/scripts/demo-swap.mjs",
+    "e2e:policy": "yarn workspace @sh/nextjs e2e:policy",
+    "e2e:synpress": "yarn workspace @sh/nextjs e2e:synpress",
     "postinstall": "husky",
     "precommit": "lint-staged",
     "lint-staged": "lint-staged"

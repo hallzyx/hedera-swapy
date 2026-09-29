@@ -1,78 +1,142 @@
-# Scaffold-HBAR — Blank starter
+# SaucerSwap Policy Swap
 
-Minimal Hedera dApp baseline: Next.js, Hardhat or Foundry, and Hedera networks (testnet, mainnet, local fork). No opinionated product UI — you add the app on top.
+A [scaffold-hbar](https://docs.hedera.com/solutions/tools/scaffold-hbar) template for a **load-bearing SaucerSwap V2** integration on **Hedera testnet**.
 
-CLI key: `blank` (branch `templates/blank-template`).
+Users quote **HBAR → SAUCE**, a pure TypeScript **policy** accepts or rejects the proposal, then RainbowKit / wagmi signs:
 
-The full product guide — CLI flags, npm vs Yarn, deploy, and verify — lives in [Scaffold HBAR on Hedera docs](https://docs.hedera.com/solutions/tools/scaffold-hbar/index). This README is what is specific to **this** template.
+1. optional **HTS `associateToken`** on precompile `0x167`
+2. **SwapRouter `multicall([exactInput, refundETH])`**
 
-## What's in this template
+Removing SaucerSwap removes the product. That is the ecosystem integration the bounty rubric scores.
 
-- Next.js App Router with wallet connect, **Debug Contracts**, and a local block explorer
-- Sample HTS contracts (`HederaToken`, `HtsTokenCreator`) so Debug Contracts has something to call
-- Hardhat and Foundry packages (the CLI can drop one)
-- Hashio RPC + Mirror Node config for Hedera testnet and mainnet
-- Package manager: Yarn (recommended) or npm — see `template.json`
-
-Create a project from this template:
+## One-command scaffold
 
 ```bash
-npm create scaffold-hbar@latest -- --template blank
+npm create scaffold-hbar@latest my-swap -- --template hallzyx/hedera-swapy
+cd my-swap
+yarn next:dev
 ```
 
-`npx create-scaffold-hbar@latest --template blank` is equivalent. The CLI also asks for frontend, Solidity framework, network, and package manager.
+Open [http://localhost:3000](http://localhost:3000).
 
-## Work from this repository
+## Prerequisites
 
-This branch uses Yarn workspaces, so clone-and-run needs Yarn. Apps created with the CLI can use Yarn (default) or npm; see the [docs](https://docs.hedera.com/solutions/tools/scaffold-hbar/index).
+- Node.js ≥ 20.18.3
+- Yarn (Corepack: `corepack enable && corepack prepare yarn@stable --activate`)
+- A Hedera **testnet** account with HBAR from the [Hedera Portal faucet](https://portal.hedera.com/faucet)
+- MetaMask (or another RainbowKit wallet) on **Hedera Testnet** (chain id `296`)
 
-### Prerequisites
+No Hardhat deploy is required for the swap demo. The Hardhat workspace remains so the monorepo matches scaffold-hbar / bounty layout.
 
-- [Node.js](https://nodejs.org/) ≥ 20.18.3
-- [Git](https://git-scm.com/) with `user.name` and `user.email` configured
-- [Yarn](https://yarnpkg.com/) (default; required if you clone this repo) or npm if you scaffolded with the CLI. For Yarn, install via Corepack:
-  ```bash
-  corepack enable && corepack prepare yarn@stable --activate
-  ```
-- **If using Foundry:** [Foundry](https://book.getfoundry.sh/getting-started/installation) (`forge`, `cast`, `anvil`)
-
-### Quick start
-
-```bash
-yarn install
-
-# Terminal 1: local Hedera-forked node
-yarn hardhat:chain
-
-# Terminal 2: deploy to that node (8545)
-yarn hardhat:deploy --network localhost
-
-# Terminal 3: Next.js app
-yarn next:start
-```
-
-Open [http://localhost:3000](http://localhost:3000) and use the **Debug Contracts** page.
-
-Frontend only (no local chain):
+## Quick start
 
 ```bash
 yarn install
 yarn next:dev
 ```
 
-`yarn hardhat:deploy` without `--network localhost` targets the in-process `hardhat` network, not the long-running fork. Local Hardhat and Foundry workflows are in [`packages/hardhat/README.md`](packages/hardhat/README.md) and [`packages/foundry/README.md`](packages/foundry/README.md). Deploy and verify on testnet/mainnet: [Hedera docs](https://docs.hedera.com/solutions/tools/scaffold-hbar/index#deploying-to-testnet).
+1. Connect a wallet on Hedera testnet.
+2. Enter an amount between **0.1** and **50** HBAR (policy limits).
+3. Confirm the quote (QuoterV2, fee tier **3000**).
+4. If prompted, **Associate SAUCE**.
+5. **Swap HBAR → SAUCE** and open the HashScan link.
 
-## Project layout
+### Headless demo (optional)
 
-- **packages/hardhat** — Hardhat config, contracts, `deploy/` scripts, tests
-- **packages/foundry** — Forge config, contracts, `script/` deploy scripts, tests
-- **packages/nextjs** — Next.js app, RainbowKit, wagmi, scaffold config
+```bash
+# ECDSA private key for a funded testnet account (never commit it)
+SWAP_PRIVATE_KEY=0x... yarn demo:swap
+```
 
-Network and RPC URLs are in `packages/hardhat/hardhat.config.ts` and `packages/foundry/foundry.toml` respectively.
+The script associates SAUCE if needed, quotes, swaps **1 HBAR**, and prints a HashScan URL.
 
-## Links
+## Architecture
 
-- [Scaffold HBAR docs](https://docs.hedera.com/solutions/tools/scaffold-hbar/index)
-- [create-scaffold-hbar](https://github.com/hedera-dev/create-scaffold-hbar) — CLI
-- [Hedera Portal faucet](https://portal.hedera.com/faucet)
-- [HashScan](https://hashscan.io/)
+| Piece | Role |
+| --- | --- |
+| `utils/saucerswap/quote.ts` | `eth_call` → QuoterV2 `quoteExactInput` |
+| `utils/saucerswap/policy.ts` | Pure limits: amount, slippage, token allowlist |
+| `utils/saucerswap/association.ts` | Mirror-node association check + HTS associate calldata |
+| `utils/saucerswap/swap.ts` | Encode `exactInput` + `refundETH` multicall |
+| `components/saucerswap/SwapCard.tsx` | UI + wagmi send |
+
+### Testnet addresses (official SaucerSwap deployments)
+
+| Contract / token | Hedera ID | Notes |
+| --- | --- | --- |
+| QuoterV2 | `0.0.1390002` | Gas-free quotes |
+| SwapRouter V2 | `0.0.1414040` | `exactInput` / `multicall` |
+| WHBAR | `0.0.15058` | Path uses WHBAR, not native HBAR |
+| SAUCE | `0.0.1183558` | Output token (6 decimals) |
+| HTS precompile | `0.0.359` / `0x…0167` | `associateToken` |
+
+Pool fee **3000** (0.30%) is the tier that quotes successfully for WHBAR/SAUCE on testnet (verified during template development).
+
+### Why RainbowKit / wagmi (not HashPack HIP-820)
+
+scaffold-hbar ships RainbowKit + burner for **EVM JSON-RPC** contract calls. SaucerSwap V2 is a Solidity router, so `writeContract` / `sendTransaction` is the native path. HIP-820 HashPack signing is out of scope for this template.
+
+### Amount decimals
+
+- Quoter / `exactInput.amountIn`: **tinybars** (8 decimals)
+- `msg.value` on Hashio / viem: **18-decimal wei** (`tinybars × 10^10`)
+
+## Policy
+
+Defaults in `DEFAULT_SWAP_POLICY`:
+
+- Min **0.1 HBAR**, max **50 HBAR**
+- Max slippage **500 bps** (5%)
+- Output allowlist: SAUCE only
+
+```bash
+yarn next:test
+```
+
+If the policy rejects, the swap button stays disabled and the UI shows the failing rule.
+
+## Testnet evidence
+
+Verified swap (MetaMask, Hedera testnet). Full table: [TESTNET_EVIDENCE.md](./TESTNET_EVIDENCE.md).
+
+- Transaction: https://hashscan.io/testnet/transaction/0.0.7314364-1790696429-805962774
+- Account: `0.0.10778819` (`0x6F21C2155bF93b49348a422A604310F8CCd6ec74`)
+- Result: 1 HBAR → 40.916451 SAUCE
+
+Quote probe (no wallet) used during development: **1 HBAR → ~45.73 SAUCE** via QuoterV2 fee 3000.
+
+## Environment
+
+Copy examples; do not commit secrets.
+
+| Variable | Where | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_HEDERA_TESTNET_RPC_URL` | `packages/nextjs/.env.local` | Optional Hashio override |
+| `NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` | `packages/nextjs/.env.local` | RainbowKit WalletConnect |
+| `SWAP_PRIVATE_KEY` | shell only | Headless `yarn demo:swap` |
+| `HCS_OPERATOR_ID` / `HCS_OPERATOR_KEY` | server env | Optional HCS receipt writer |
+| `HCS_TOPIC_ID` | server env | Optional receipt topic |
+
+## Optional: HCS receipts
+
+If `HCS_OPERATOR_ID`, `HCS_OPERATOR_KEY`, and `HCS_TOPIC_ID` are set, `POST /api/receipts` appends a compact JSON receipt after a confirmed swap. The UI still works without them.
+
+## Quality commands
+
+```bash
+yarn lint
+yarn next:check-types
+yarn next:test
+yarn next:build
+yarn e2e:policy   # Playwright UI policy checks (no MetaMask)
+```
+
+## Licence
+
+MIT — see [LICENCE](./LICENCE).
+
+## Bounty notes
+
+- Eligibility: `template.json`, `README.md`, `AGENTS.md`, clean install/lint/build, Hedera service in play (HTS associate + SaucerSwap router), no committed `.env`
+- Ecosystem integration: SaucerSwap V2 (DEX) is load-bearing
+- Hedera depth: HTS association + EVM router on Hedera testnet (+ optional HCS)

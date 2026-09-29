@@ -1,138 +1,79 @@
 # Agent instructions
 
-Briefing for coding agents in this app (Cursor, Claude Code, Codex). Claude Code loads it through `CLAUDE.md`.
+Briefing for coding agents in this app (Cursor, Claude Code, Codex). Claude Code also loads `CLAUDE.md`.
 
-This is a Scaffold-HBAR dApp: Next.js App Router, wallet connect, Debug Contracts, and Hedera networks (testnet, mainnet, local fork). The CLI may have left only Hardhat or only Foundry.
+This is a **Scaffold-HBAR** template: Next.js App Router, RainbowKit, Wagmi, Viem, DaisyUI, Hardhat workspace present for monorepo shape. The product is a **policy-gated SaucerSwap V2 swap** (HBAR → SAUCE) on **Hedera testnet**.
 
-Use the package manager this project was created with (`packageManager` in the root `package.json`, or the lockfile). Examples use `yarn`; if the app was created with npm, swap `yarn <script>` for `npm run <script>`.
+Package manager: **Yarn** (`packageManager` in root `package.json`). Prefer `yarn <script>` over npm.
 
-## Which Solidity package
+## Product boundaries
 
-- `packages/hardhat` exists → Hardhat (`hardhat-deploy`)
-- `packages/foundry` exists → Foundry (Forge scripts)
-- `packages/nextjs` is always the frontend (App Router, RainbowKit, Wagmi, Viem, DaisyUI)
+**In scope**
 
-Follow only the flavor that is present.
+- QuoterV2 `quoteExactInput` (read-only)
+- Pure policy in `packages/nextjs/utils/saucerswap/policy.ts`
+- HTS `associateToken` via precompile `0x167`
+- SwapRouter V2 `multicall([exactInput, refundETH])` signed with wagmi
+- Optional HCS receipt via server operator keys
+- Optional intent form that fills the swap card (no LLM)
+
+**Out of scope**
+
+- HashPack / HIP-820 `hedera_signTransaction`
+- x402 partial-sign facilitator flows
+- Hedera Agent Kit chat as a required path
+- Changing the default pair away from WHBAR/SAUCE fee 3000 without re-probing QuoterV2
+
+## Fixed testnet pair
+
+| Role | ID | EVM |
+| --- | --- | --- |
+| WHBAR | `0.0.15058` | `hederaNumToAddress(15058)` |
+| SAUCE | `0.0.1183558` | `hederaNumToAddress(1183558)` |
+| QuoterV2 | `0.0.1390002` | |
+| SwapRouter | `0.0.1414040` | |
+| Fee tier | `3000` | verified live on testnet |
+
+Addresses live in `packages/nextjs/utils/saucerswap/addresses.ts`. Do not hardcode hex elsewhere.
+
+## Signing model
+
+Use **RainbowKit + wagmi** on chain id **296**.
+
+- Quotes: `publicClient.call` / `eth_call` (no wallet)
+- Associate / swap: `writeContract` / `sendTransaction`
+- Burner wallet is fine for demos when `enableBurnerWallet` is true
+- MetaMask Synpress covers UI + connect; do not require Playwright MCP
+
+Decimals: tinybars (8) for quoter/`amountIn`; EVM `value` is tinybars × `10^10`.
 
 ## Commands
 
-Package-prefixed scripts for package-specific work. Keep only truly cross-workspace commands unprefixed.
-
 ```bash
-# Local chain + deploy + frontend (separate terminals)
-yarn hardhat:chain    # Hedera-forked Hardhat node on 8545
-yarn hardhat:deploy --network localhost
-yarn foundry:chain    # Anvil from the Foundry package
-yarn foundry:deploy
-yarn next:start       # http://localhost:3000
-
-# Frontend only
 yarn next:dev
-
-# Quality / build
-yarn lint
-yarn format
+yarn next:test
 yarn next:build
-yarn hardhat:compile
-yarn foundry:compile
-
-# Live networks
-yarn hardhat:deploy --network hederaTestnet   # or hederaMainnet
-yarn foundry:deploy --network hedera_testnet  # or hedera_mainnet
-yarn hardhat:verify:testnet
-yarn foundry:verify:testnet
-
-# Deployer account
-yarn hardhat:account:generate
-yarn hardhat:account:import
-yarn hardhat:account
+yarn lint
+yarn demo:swap          # needs SWAP_PRIVATE_KEY
+yarn e2e:policy         # Playwright policy UI
+yarn e2e:synpress       # Synpress + MetaMask when configured
 ```
 
-`yarn hardhat:deploy` without `--network localhost` targets the in-process `hardhat` network, not the long-running fork.
+Local Hardhat chain is optional for this template; the swap targets **public Hedera testnet**.
 
-## Layout
+## Files to touch first
 
-### Hardhat
-
-- Contracts: `packages/hardhat/contracts/`
-- Deploy scripts: `packages/hardhat/deploy/`
-- Tests: `packages/hardhat/test/`
-- Config: `packages/hardhat/hardhat.config.ts`
-- Tagged deploy: if `deployHederaToken.tags = ["HederaToken"]`, run `yarn hardhat:deploy --tags HederaToken`
-
-### Foundry
-
-- Contracts: `packages/foundry/contracts/`
-- Deploy scripts: `packages/foundry/script/` (`Deploy.s.sol`, `DeployHederaToken.s.sol`, `DeployHtsTokenCreator.s.sol`)
-- Tests: `packages/foundry/test/`
-- Config: `packages/foundry/foundry.toml`
-- One contract: `yarn foundry:deploy --file DeployHederaToken.s.sol`
-
-### After deploy
-
-ABIs and addresses are written to `packages/nextjs/contracts/deployedContracts.ts`. Put third-party contracts in `packages/nextjs/contracts/externalContracts.ts`.
-
-Sample contracts on this starter: `HederaToken` (ERC-20) and `HtsTokenCreator` (HTS precompile at `0x167`).
-
-## Frontend contract interaction
-
-Hooks live in `packages/nextjs/hooks/scaffold-hbar`. Use the names that exist in the codebase:
-
-- `useScaffoldReadContract` — not `useScaffoldContractRead`
-- `useScaffoldWriteContract` — not `useScaffoldContractWrite`
-
-Also: `useScaffoldWatchContractEvent`, `useScaffoldEventHistory`, `useDeployedContractInfo`, `useScaffoldContract`, `useTransactor`.
-
-```typescript
-const { data: balance } = useScaffoldReadContract({
-  contractName: "HederaToken",
-  functionName: "balanceOf",
-  args: [connectedAddress],
-});
-
-const { writeContractAsync, isPending } = useScaffoldWriteContract({
-  contractName: "HederaToken",
-});
-
-await writeContractAsync({
-  functionName: "mint",
-  args: [connectedAddress, parseEther("1")],
-});
-```
-
-`HederaToken.mint` is `onlyOwner`. For HTS creation, `HtsTokenCreator.createToken` is payable (HTS fee via `msg.value`) and emits `TokenCreated`.
-
-### UI
-
-Use `@scaffold-hbar-ui/components` for web3 UI: `Address`, `AddressInput`, `Balance`, `EtherInput`, `IntegerInput`.
-
-Use DaisyUI classes, not raw Tailwind when a DaisyUI component exists:
-
-```tsx
-<button className="btn btn-primary">Connect</button>
-```
-
-### Networks
-
-- Hardhat: `packages/hardhat/hardhat.config.ts` (`hederaTestnet` 296, `hederaMainnet` 295)
-- Foundry: `packages/foundry/foundry.toml` (`hedera_testnet`, `hedera_mainnet`)
-- Next.js: `packages/nextjs/scaffold.config.ts` (target networks, polling, RPC overrides, WalletConnect)
-
-## Style
-
-| Style | Use |
+| Path | Why |
 | --- | --- |
-| `UpperCamelCase` | types, components |
-| `lowerCamelCase` | variables, functions |
-| `CONSTANT_CASE` | constants |
-| `snake_case` | Hardhat deploy files and Foundry scripts |
+| `packages/nextjs/components/saucerswap/SwapCard.tsx` | Main UX |
+| `packages/nextjs/utils/saucerswap/*` | Addresses, policy, quote, swap encoding |
+| `packages/nextjs/app/page.tsx` | Landing |
+| `template.json` | scaffold-hbar capabilities |
 
-Next.js imports use the `~~` alias:
+## Policy rules
 
-```tsx
-import { useTargetNetwork } from "~~/hooks/scaffold-hbar";
-```
+When changing limits, update `DEFAULT_SWAP_POLICY` and the Vitest cases in `policy.test.ts`. Never arm the swap button when `evaluateSwapPolicy` returns `ok: false`.
 
-App Router pages live under `packages/nextjs/app/`. Add `"use client"` when the page uses hooks.
+## Secrets
 
-Prefer `type` over `interface`. No `T` prefix on types. Let TypeScript infer when it can. Comments should add information.
+Never commit `.env`, private keys, or operator keys. Use `.env.example` / README tables only.
