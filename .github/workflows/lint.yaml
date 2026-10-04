@@ -1,4 +1,4 @@
-name: Lint
+name: CI
 
 on:
   push:
@@ -46,3 +46,15 @@ jobs:
 
       - name: Run hardhat lint
         run: yarn hardhat:lint --max-warnings=0
+
+      - name: Check agent skills are mirrored for every agent
+        run: yarn skills:check
+
+      - name: Run nextjs unit tests
+        run: yarn next:test
+
+      - name: Run treasury guard contract tests
+        run: yarn hardhat:test:guard
+
+      - name: Build nextjs
+        run: yarn next:build

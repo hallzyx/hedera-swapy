@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Hex } from "viem";
 import { useAccount, useSendTransaction, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import {
@@ -16,6 +16,7 @@ import {
   isSauceAssociated,
   parseHbarToTinybars,
   quoteExactInputHbarToSauce,
+  requestReceipt,
 } from "~~/utils/saucerswap";
 
 type QuoteState = {
@@ -37,12 +38,18 @@ export const SwapCard = ({ amount, slippageBps, onAmountChange, onSlippageChange
   const [quoting, setQuoting] = useState(false);
   const [associated, setAssociated] = useState<boolean | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [lastTxHash, setLastTxHash] = useState<Hex | null>(null);
+  const [assocTxHash, setAssocTxHash] = useState<Hex | null>(null);
+  const [swapTxHash, setSwapTxHash] = useState<Hex | null>(null);
+  const receiptSentFor = useRef<Hex | null>(null);
+  const lastTxHash = swapTxHash ?? assocTxHash;
 
   const { sendTransactionAsync, isPending: isSending } = useSendTransaction();
   const { writeContractAsync, isPending: isAssociating } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash: lastTxHash ?? undefined,
+    hash: swapTxHash ?? undefined,
+  });
+  const { isLoading: isAssocConfirming, isSuccess: assocConfirmed } = useWaitForTransactionReceipt({
+    hash: assocTxHash ?? undefined,
   });
 
   const tinybars = useMemo(() => {
@@ -70,12 +77,47 @@ export const SwapCard = ({ amount, slippageBps, onAmountChange, onSlippageChange
       return;
     }
     const result = await isSauceAssociated(address);
-    setAssociated(result.associated);
+    // If the mirror node could not be reached the state is unknown (null), never "not associated".
+    setAssociated(result.checked ? result.associated : null);
   }, [address]);
 
   useEffect(() => {
     void refreshAssociation();
   }, [refreshAssociation]);
+
+  // After the associate tx confirms, poll the mirror node: a confirmed EVM call to the HTS precompile
+  // does not by itself prove the association happened.
+  useEffect(() => {
+    if (!assocConfirmed || !address) return;
+    let cancelled = false;
+    void (async () => {
+      for (let attempt = 0; attempt < 4 && !cancelled; attempt++) {
+        const result = await isSauceAssociated(address);
+        if (cancelled) return;
+        if (result.checked && result.associated) {
+          setAssociated(true);
+          setStatus("SAUCE associated. You can swap now.");
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 2500));
+      }
+      if (!cancelled) {
+        setStatus(
+          "The association transaction confirmed, but SAUCE is not showing on your account yet. Check HashScan, then retry.",
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [assocConfirmed, address]);
+
+  // Write the HCS receipt only once the swap is confirmed on-chain (the server verifies it again).
+  useEffect(() => {
+    if (!isConfirmed || !swapTxHash || !address || receiptSentFor.current === swapTxHash) return;
+    receiptSentFor.current = swapTxHash;
+    requestReceipt(swapTxHash);
+  }, [isConfirmed, swapTxHash, address]);
 
   const fetchQuote = useCallback(async () => {
     if (tinybars === null || !policy.ok) {
@@ -112,6 +154,7 @@ export const SwapCard = ({ amount, slippageBps, onAmountChange, onSlippageChange
     !quoting &&
     !isSending &&
     !isAssociating &&
+    !isAssocConfirming &&
     !isConfirming;
 
   const handleAssociate = async () => {
@@ -136,9 +179,9 @@ export const SwapCard = ({ amount, slippageBps, onAmountChange, onSlippageChange
         functionName: "associateToken",
         args: [address, SAUCERSWAP_TESTNET.sauce],
       });
-      setLastTxHash(hash);
-      setStatus("SAUCE association submitted. Wait for confirmation, then swap.");
-      setTimeout(() => void refreshAssociation(), 4000);
+      setAssocTxHash(hash);
+      setSwapTxHash(null);
+      setStatus("SAUCE association submitted. Waiting for confirmation…");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Association failed.");
     }
@@ -152,11 +195,14 @@ export const SwapCard = ({ amount, slippageBps, onAmountChange, onSlippageChange
         setStatus("Associate SAUCE to your account before swapping.");
         return;
       }
+      // Re-quote right before signing so the slippage floor is based on the current pool price.
+      const fresh = await quoteExactInputHbarToSauce(tinybars);
+      setQuote({ amountOut: fresh.amountOut, path: fresh.path });
       const call = buildExactInputSwapCall({
         recipient: address,
-        path: quote.path,
+        path: fresh.path,
         amountInTinybars: tinybars,
-        quotedAmountOut: quote.amountOut,
+        quotedAmountOut: fresh.amountOut,
         slippageBps,
       });
       const hash = await sendTransactionAsync({
@@ -165,18 +211,8 @@ export const SwapCard = ({ amount, slippageBps, onAmountChange, onSlippageChange
         value: call.value,
         gas: 2_000_000n,
       });
-      setLastTxHash(hash);
+      setSwapTxHash(hash);
       setStatus("Swap submitted. Waiting for confirmation…");
-      void fetch("/api/receipts", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          swapTxHash: hash,
-          payer: address,
-          amountInTinybars: tinybars.toString(),
-          tokenOut: SAUCERSWAP_TESTNET.tokenIds.sauce,
-        }),
-      }).catch(() => undefined);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Swap failed.");
     }
@@ -302,7 +338,7 @@ export const SwapCard = ({ amount, slippageBps, onAmountChange, onSlippageChange
         {(status || lastTxHash) && (
           <div className="rounded-xl border border-base-300 p-4 text-sm space-y-2" data-testid="swap-status">
             {status && <p className="m-0">{status}</p>}
-            {isConfirmed && <p className="m-0 text-success">Confirmed on Hedera testnet.</p>}
+            {swapTxHash && isConfirmed && <p className="m-0 text-success">Swap confirmed on Hedera testnet.</p>}
             {lastTxHash && (
               <a
                 className="link link-primary break-all"

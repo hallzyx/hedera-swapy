@@ -1,0 +1,23 @@
+{
+  "$comment": "Single source of truth for the treasury policy defaults. Read by the Hardhat deploy script, the browser pre-flight policy (policy.ts), the UI checklist and `yarn doctor`. Amounts are HBAR as decimal strings. Edit here, run `yarn next:test`, then redeploy or call the admin setters on an existing guard.",
+  "limits": {
+    "minHbarPerSwap": "0.1",
+    "maxHbarPerSwap": "50",
+    "dailyCapHbar": "100"
+  },
+  "approval": {
+    "thresholdHbar": "10",
+    "requiredApprovals": 1
+  },
+  "browser": {
+    "maxSlippageBps": 500
+  },
+  "tokens": [
+    {
+      "symbol": "SAUCE",
+      "tokenId": "0.0.1183558",
+      "decimals": 6,
+      "minOutPerHbar": "30000000"
+    }
+  ]
+}
