@@ -39,6 +39,8 @@
     "next:serve": "yarn workspace @sh/nextjs serve",
     "next:start": "yarn workspace @sh/nextjs start",
     "next:test": "yarn workspace @sh/nextjs test",
+    "skills:sync": "node scripts/sync-skills.mjs",
+    "skills:check": "node scripts/sync-skills.mjs --check",
     "demo:swap": "node packages/nextjs/scripts/demo-swap.mjs",
     "demo:guard": "node packages/nextjs/scripts/demo-guard.mjs",
     "e2e:policy": "yarn workspace @sh/nextjs e2e:policy",

@@ -47,6 +47,9 @@ jobs:
       - name: Run hardhat lint
         run: yarn hardhat:lint --max-warnings=0
 
+      - name: Check agent skills are mirrored for every agent
+        run: yarn skills:check
+
       - name: Run nextjs unit tests
         run: yarn next:test
 

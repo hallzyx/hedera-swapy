@@ -172,6 +172,10 @@ If `HCS_OPERATOR_ID`, `HCS_OPERATOR_KEY` and `HCS_TOPIC_ID` are set, the UI post
 
 The rate limiter and duplicate set live in process memory; use a shared store if you run many serverless instances.
 
+## For coding agents
+
+The repo ships an agent skill, `treasury-swap-guard`, that tells Claude Code, Cursor, Codex or OpenCode which files to touch for each kind of change. `AGENTS.md` points every agent at it at the start of a session. The canonical copy lives in `.agents/skills/`; `yarn skills:sync` mirrors it to `.claude/skills/`.
+
 ## Adapting it to your treasury
 
 - **Another output token:** call `setTokenRule(token, true, minOutPerHbar)`, make sure the payout account is associated with it, and re-probe QuoterV2 for the pool fee before relying on a path.

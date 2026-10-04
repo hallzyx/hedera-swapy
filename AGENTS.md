@@ -25,6 +25,10 @@ Target user: a treasurer or ops lead of a DAO or small team converting treasury 
 - Merchant checkout, invoices, liquidity provision, multi-hop routes
 - Changing the default pair away from WHBAR/SAUCE fee 3000 without re-probing QuoterV2
 
+## Agent skill (load this first)
+
+Before changing anything, load the project skill `treasury-swap-guard` (`.agents/skills/treasury-swap-guard/SKILL.md`). It maps each kind of change (limits, tokens, roles, approval lane, UI, receipts, deploy, docs) to the files, tests and checks involved, with recipes and invariants in `references/`. Cursor, Codex and OpenCode read `.agents/skills/`; Claude Code reads the mirror in `.claude/skills/`. Edit the skill under `.agents/skills/`, then run `yarn skills:sync`; CI runs `yarn skills:check`.
+
 ## Two policy layers (keep them in sync)
 
 | Layer | File | Role |
@@ -71,6 +75,7 @@ yarn hardhat:test:guard   # Hardhat, in-memory chain: TreasuryPolicyGuard + appr
 yarn next:build
 yarn lint
 yarn hardhat:deploy --network hederaTestnet --tags TreasuryPolicyGuard
+yarn skills:sync          # mirror .agents/skills into .claude/skills (CI: yarn skills:check)
 yarn demo:swap            # needs SWAP_PRIVATE_KEY (UI-mode swap, no guard)
 yarn demo:guard           # needs TREASURY_GUARD_ADDRESS + SWAP_PRIVATE_KEY (+ APPROVER_PRIVATE_KEY): evidence table
 yarn e2e:policy           # Playwright policy UI
