@@ -59,7 +59,8 @@ if (!guard || !executorKey) {
 const hex = key => (key.startsWith("0x") ? key : `0x${key}`);
 const transport = http(RPC, { batch: false });
 const publicClient = createPublicClient({ chain: hederaTestnet, transport });
-const walletFor = key => createWalletClient({ account: privateKeyToAccount(hex(key)), chain: hederaTestnet, transport });
+const walletFor = key =>
+  createWalletClient({ account: privateKeyToAccount(hex(key)), chain: hederaTestnet, transport });
 
 const executor = walletFor(executorKey);
 const guardian = walletFor(process.env.GUARDIAN_PRIVATE_KEY || executorKey);
@@ -117,7 +118,12 @@ async function main() {
   console.log("Guard", guard, "| executor/payout", recipient);
   const read = functionName => publicClient.readContract({ address: guard, abi: guardAbi, functionName });
   const [limits, policy, paused] = await Promise.all([read("limits"), read("approvalPolicy"), read("paused")]);
-  const rule = await publicClient.readContract({ address: guard, abi: guardAbi, functionName: "tokenRules", args: [SAUCE] });
+  const rule = await publicClient.readContract({
+    address: guard,
+    abi: guardAbi,
+    functionName: "tokenRules",
+    args: [SAUCE],
+  });
   console.log("Limits (tinybars)", limits, "| approval", policy, "| paused", paused, "| SAUCE rule", rule);
   if (paused) throw new Error("The guard is paused. Unpause it first.");
   if (!rule[0]) throw new Error("SAUCE is not allowed on this guard. Run the deploy script or call setTokenRule.");
@@ -151,7 +157,13 @@ async function main() {
   if (approver && approvalOn) {
     const large = threshold + HBAR;
     const minOut = await minOutFor(large, rule[1]);
-    await send(`Direct swap of ${large / HBAR} HBAR is refused (needs approval)`, executor, "swapHbarForToken", [path, recipient, large, minOut, deadline()], "reverted");
+    await send(
+      `Direct swap of ${large / HBAR} HBAR is refused (needs approval)`,
+      executor,
+      "swapHbarForToken",
+      [path, recipient, large, minOut, deadline()],
+      "reverted",
+    );
 
     await send(`Propose ${large / HBAR} HBAR`, executor, "proposeSwap", [path, recipient, large, minOut], "success");
     const id1 = await publicClient.readContract({ address: guard, abi: guardAbi, functionName: "proposalCount" });
@@ -159,17 +171,35 @@ async function main() {
     await send(`Approver signs proposal #${id1}`, approver, "approveSwap", [id1], "success");
     await send(`Execute proposal #${id1}`, executor, "executeSwap", [id1, path, deadline()], "success");
 
-    await send(`Propose ${large / HBAR} HBAR again`, executor, "proposeSwap", [path, recipient, large, minOut], "success");
+    await send(
+      `Propose ${large / HBAR} HBAR again`,
+      executor,
+      "proposeSwap",
+      [path, recipient, large, minOut],
+      "success",
+    );
     const id2 = await publicClient.readContract({ address: guard, abi: guardAbi, functionName: "proposalCount" });
     await send(`Guardian vetoes proposal #${id2}`, guardian, "vetoSwap", [id2], "success");
-    await send(`Execute vetoed proposal #${id2} is refused`, executor, "executeSwap", [id2, path, deadline()], "reverted");
+    await send(
+      `Execute vetoed proposal #${id2} is refused`,
+      executor,
+      "executeSwap",
+      [id2, path, deadline()],
+      "reverted",
+    );
   } else {
     console.log("Skipping the approval lane (set APPROVER_PRIVATE_KEY and deploy with TREASURY_APPROVER).");
   }
 
   // 4. pause blocks swaps; only the admin resumes
   await send("Guardian pauses the treasury", guardian, "pause", [], "success");
-  await send("Swap while paused is refused", executor, "swapHbarForToken", [path, recipient, small, 1n, deadline()], "reverted");
+  await send(
+    "Swap while paused is refused",
+    executor,
+    "swapHbarForToken",
+    [path, recipient, small, 1n, deadline()],
+    "reverted",
+  );
   await send("Admin unpauses the treasury", admin, "unpause", [], "success");
 
   console.log("\n| Step | Expected | Result | HashScan |\n| --- | --- | --- | --- |");

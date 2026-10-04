@@ -37,7 +37,7 @@ describe("TreasuryPolicyGuard", function () {
 
     const swap = async (
       overrides: {
-        signer?: (typeof admin);
+        signer?: typeof admin;
         path?: string;
         recipient?: string;
         amountIn?: bigint;
@@ -87,14 +87,8 @@ describe("TreasuryPolicyGuard", function () {
 
     it("only lets EXECUTOR_ROLE swap", async function () {
       const { guard, swap, stranger, guardian } = await loadFixture(deployFixture);
-      await expect(swap({ signer: stranger })).to.be.revertedWithCustomError(
-        guard,
-        "AccessControlUnauthorizedAccount",
-      );
-      await expect(swap({ signer: guardian })).to.be.revertedWithCustomError(
-        guard,
-        "AccessControlUnauthorizedAccount",
-      );
+      await expect(swap({ signer: stranger })).to.be.revertedWithCustomError(guard, "AccessControlUnauthorizedAccount");
+      await expect(swap({ signer: guardian })).to.be.revertedWithCustomError(guard, "AccessControlUnauthorizedAccount");
     });
 
     it("rejects amounts below the minimum and above the per-swap maximum", async function () {

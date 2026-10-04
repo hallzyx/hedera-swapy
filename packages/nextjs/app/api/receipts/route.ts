@@ -61,7 +61,10 @@ export async function POST(request: Request) {
   }
 
   if (!limiter.allow(clientKey(request))) {
-    return NextResponse.json({ ok: false, message: "Too many receipt requests. Try again in a minute." }, { status: 429 });
+    return NextResponse.json(
+      { ok: false, message: "Too many receipt requests. Try again in a minute." },
+      { status: 429 },
+    );
   }
 
   let body: ReceiptBody;
@@ -73,7 +76,10 @@ export async function POST(request: Request) {
 
   const swapTxHash = body.swapTxHash?.toLowerCase();
   if (!swapTxHash || !TX_HASH_RE.test(swapTxHash)) {
-    return NextResponse.json({ ok: false, message: "swapTxHash must be a 32-byte 0x transaction hash." }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, message: "swapTxHash must be a 32-byte 0x transaction hash." },
+      { status: 400 },
+    );
   }
 
   if (written.has(swapTxHash)) {

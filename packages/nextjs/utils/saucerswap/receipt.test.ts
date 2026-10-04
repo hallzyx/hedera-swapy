@@ -59,7 +59,9 @@ describe("verifySwapReceipt", () => {
 
   it("rejects missing, failed or misdirected transactions", () => {
     expect(verifySwapReceipt(null, [router]).ok).toBe(false);
-    expect(verifySwapReceipt({ result: "CONTRACT_REVERT_EXECUTED", from: sender, to: router }, [router]).ok).toBe(false);
+    expect(verifySwapReceipt({ result: "CONTRACT_REVERT_EXECUTED", from: sender, to: router }, [router]).ok).toBe(
+      false,
+    );
     expect(verifySwapReceipt({ result: "SUCCESS", from: sender, to: "0x" + "11".repeat(20) }, [router]).ok).toBe(false);
     expect(verifySwapReceipt({ result: "SUCCESS", to: router }, [router]).ok).toBe(false);
   });

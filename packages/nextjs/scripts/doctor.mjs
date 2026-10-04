@@ -74,9 +74,17 @@ function accountFrom(addressVar, keyVar) {
 
 function checkNodeAndConfig() {
   const current = process.versions.node.split(".").map(Number);
-  const ok = current[0] > MIN_NODE[0] || (current[0] === MIN_NODE[0] && (current[1] > MIN_NODE[1] || (current[1] === MIN_NODE[1] && current[2] >= MIN_NODE[2])));
+  const ok =
+    current[0] > MIN_NODE[0] ||
+    (current[0] === MIN_NODE[0] &&
+      (current[1] > MIN_NODE[1] || (current[1] === MIN_NODE[1] && current[2] >= MIN_NODE[2])));
   if (ok) pass("Node.js", `v${process.versions.node}`);
-  else fail("Node.js", `v${process.versions.node}, need ${MIN_NODE.join(".")} or newer`, "Install a newer Node (nvm install 20).");
+  else
+    fail(
+      "Node.js",
+      `v${process.versions.node}, need ${MIN_NODE.join(".")} or newer`,
+      "Install a newer Node (nvm install 20).",
+    );
 
   const config = JSON.parse(readFileSync(new URL("../../../treasury.config.json", import.meta.url), "utf8"));
   const { limits, approval, tokens } = config;
@@ -86,19 +94,29 @@ function checkNodeAndConfig() {
   if (!(max > 0)) problems.push("maxHbarPerSwap must be above zero");
   if (min > max) problems.push("minHbarPerSwap is above maxHbarPerSwap");
   if (max > Number(limits.dailyCapHbar)) problems.push("maxHbarPerSwap is above dailyCapHbar");
-  if (!Number.isInteger(approval.requiredApprovals) || approval.requiredApprovals < 1) problems.push("requiredApprovals must be 1 or more");
+  if (!Number.isInteger(approval.requiredApprovals) || approval.requiredApprovals < 1)
+    problems.push("requiredApprovals must be 1 or more");
   if (!Array.isArray(tokens) || tokens.length === 0) problems.push("no output tokens");
   for (const token of tokens ?? []) {
     if (!/^0\.0\.\d+$/.test(token.tokenId)) problems.push(`${token.symbol}: bad tokenId`);
   }
-  if (problems.length === 0) pass("treasury.config.json", `${limits.minHbarPerSwap}-${limits.maxHbarPerSwap} HBAR per swap, ${limits.dailyCapHbar}/day, ${tokens.length} token(s)`);
-  else fail("treasury.config.json", problems.join("; "), "Fix the values in treasury.config.json at the repository root.");
+  if (problems.length === 0)
+    pass(
+      "treasury.config.json",
+      `${limits.minHbarPerSwap}-${limits.maxHbarPerSwap} HBAR per swap, ${limits.dailyCapHbar}/day, ${tokens.length} token(s)`,
+    );
+  else
+    fail("treasury.config.json", problems.join("; "), "Fix the values in treasury.config.json at the repository root.");
   return config;
 }
 
 function checkEnv(guard) {
   if (!guard) {
-    warn("Guard address", "not set", "Deploy the guard, then set NEXT_PUBLIC_TREASURY_GUARD_ADDRESS in packages/nextjs/.env.local. UI mode works without it.");
+    warn(
+      "Guard address",
+      "not set",
+      "Deploy the guard, then set NEXT_PUBLIC_TREASURY_GUARD_ADDRESS in packages/nextjs/.env.local. UI mode works without it.",
+    );
   } else if (!ADDRESS_RE.test(guard)) {
     fail("Guard address", "is not a 20-byte hex address", "Use the 0x... address printed by the deploy script.");
   } else {
@@ -108,10 +126,19 @@ function checkEnv(guard) {
   const hcs = ["HCS_OPERATOR_ID", "HCS_OPERATOR_KEY", "HCS_TOPIC_ID"].filter(name => process.env[name]);
   if (hcs.length === 0) info("HCS receipts", "disabled (optional)");
   else if (hcs.length === 3) pass("HCS receipts", "operator and topic configured");
-  else warn("HCS receipts", `only ${hcs.join(", ")} set`, "Set all three of HCS_OPERATOR_ID, HCS_OPERATOR_KEY and HCS_TOPIC_ID, or none.");
+  else
+    warn(
+      "HCS receipts",
+      `only ${hcs.join(", ")} set`,
+      "Set all three of HCS_OPERATOR_ID, HCS_OPERATOR_KEY and HCS_TOPIC_ID, or none.",
+    );
 
   if (!process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID) {
-    warn("WalletConnect project id", "not set", "Set NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID if the wallet modal fails to load.");
+    warn(
+      "WalletConnect project id",
+      "not set",
+      "Set NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID if the wallet modal fails to load.",
+    );
   }
 }
 
@@ -119,7 +146,12 @@ async function checkNetwork(client) {
   await check("Hedera testnet RPC", async () => {
     const chainId = await client.getChainId();
     if (chainId === 296) pass("Hedera testnet RPC", `chain id ${chainId}`);
-    else fail("Hedera testnet RPC", `chain id ${chainId}, expected 296`, "Point NEXT_PUBLIC_HEDERA_TESTNET_RPC_URL at a testnet relay.");
+    else
+      fail(
+        "Hedera testnet RPC",
+        `chain id ${chainId}, expected 296`,
+        "Point NEXT_PUBLIC_HEDERA_TESTNET_RPC_URL at a testnet relay.",
+      );
   });
   await check("Mirror node", async () => {
     const res = await fetch(`${MIRROR}/api/v1/blocks?limit=1`);
@@ -140,26 +172,45 @@ async function checkGuard(client, guard, config) {
 
   const code = await client.getCode({ address: guard });
   if (!code || code === "0x") {
-    fail("Guard contract", "no contract code at that address", "Check the address and that you deployed to testnet (chain 296).");
+    fail(
+      "Guard contract",
+      "no contract code at that address",
+      "Check the address and that you deployed to testnet (chain 296).",
+    );
     return false;
   }
   pass("Guard contract", "deployed");
 
   await check("Guard policy", async () => {
-    const [[minIn, maxIn, dailyCap], [threshold, required]] = await Promise.all([read("limits"), read("approvalPolicy")]);
+    const [[minIn, maxIn, dailyCap], [threshold, required]] = await Promise.all([
+      read("limits"),
+      read("approvalPolicy"),
+    ]);
     const hbar = value => parseUnits(value, 8);
     const expected = config.limits;
-    const same = minIn === hbar(expected.minHbarPerSwap) && maxIn === hbar(expected.maxHbarPerSwap) && dailyCap === hbar(expected.dailyCapHbar);
+    const same =
+      minIn === hbar(expected.minHbarPerSwap) &&
+      maxIn === hbar(expected.maxHbarPerSwap) &&
+      dailyCap === hbar(expected.dailyCapHbar);
     const detail = `${formatUnits(minIn, 8)}-${formatUnits(maxIn, 8)} HBAR per swap, ${formatUnits(dailyCap, 8)}/day`;
     if (same) pass("Guard limits", `${detail} (match the config)`);
-    else warn("Guard limits", `${detail} (differ from treasury.config.json)`, "Fine if the admin changed them on purpose; otherwise call setLimits or edit the config.");
+    else
+      warn(
+        "Guard limits",
+        `${detail} (differ from treasury.config.json)`,
+        "Fine if the admin changed them on purpose; otherwise call setLimits or edit the config.",
+      );
 
     const approvalOff = threshold >= maxIn;
     if (approvalOff) info("Approval lane", "off: every swap uses the direct lane");
     else if (threshold === hbar(config.approval.thresholdHbar) && required === config.approval.requiredApprovals) {
       pass("Approval lane", `swaps above ${formatUnits(threshold, 8)} HBAR need ${required} approval(s)`);
     } else {
-      warn("Approval lane", `threshold ${formatUnits(threshold, 8)} HBAR, ${required} approval(s) (differs from the config)`, "Call setApprovalPolicy or edit the config.");
+      warn(
+        "Approval lane",
+        `threshold ${formatUnits(threshold, 8)} HBAR, ${required} approval(s) (differs from the config)`,
+        "Call setApprovalPolicy or edit the config.",
+      );
     }
   });
 
@@ -167,8 +218,18 @@ async function checkGuard(client, guard, config) {
     for (const token of config.tokens) {
       const address = `0x${BigInt(token.tokenId.split(".")[2]).toString(16).padStart(40, "0")}`;
       const [allowed, floor] = await read("tokenRules", [address]);
-      if (!allowed) fail(`Token ${token.symbol}`, "not allowed on the guard", `Admin: setTokenRule(${address}, true, ${token.minOutPerHbar}).`);
-      else if (floor.toString() !== token.minOutPerHbar) warn(`Token ${token.symbol}`, `price floor ${floor} (config says ${token.minOutPerHbar})`, "Fine if intentional.");
+      if (!allowed)
+        fail(
+          `Token ${token.symbol}`,
+          "not allowed on the guard",
+          `Admin: setTokenRule(${address}, true, ${token.minOutPerHbar}).`,
+        );
+      else if (floor.toString() !== token.minOutPerHbar)
+        warn(
+          `Token ${token.symbol}`,
+          `price floor ${floor} (config says ${token.minOutPerHbar})`,
+          "Fine if intentional.",
+        );
       else pass(`Token ${token.symbol}`, `allowed, floor ${floor} per HBAR`);
     }
   });
@@ -181,7 +242,12 @@ async function checkGuard(client, guard, config) {
     const tinybars = balance / 10n ** 10n;
     const maxSwap = parseUnits(config.limits.maxHbarPerSwap, 8);
     if (tinybars === 0n) fail("Guard balance", "0 HBAR", "Send testnet HBAR to the guard address.");
-    else if (tinybars < maxSwap) warn("Guard balance", `${formatUnits(tinybars, 8)} HBAR, below the per-swap maximum`, "Top up the guard if you want to test large swaps.");
+    else if (tinybars < maxSwap)
+      warn(
+        "Guard balance",
+        `${formatUnits(tinybars, 8)} HBAR, below the per-swap maximum`,
+        "Top up the guard if you want to test large swaps.",
+      );
     else pass("Guard balance", `${formatUnits(tinybars, 8)} HBAR`);
   });
   return true;
@@ -213,7 +279,12 @@ async function checkAccounts(client, guard, config) {
     if (!guard) continue;
     await check(`${label} role`, async () => {
       const hash = role === "DEFAULT_ADMIN_ROLE" ? ZERO_ROLE : keccak256(stringToHex(role));
-      const has = await client.readContract({ address: guard, abi: guardAbi, functionName: "hasRole", args: [hash, address] });
+      const has = await client.readContract({
+        address: guard,
+        abi: guardAbi,
+        functionName: "hasRole",
+        args: [hash, address],
+      });
       if (has) pass(`${label} role`, address);
       else if (required) fail(`${label} role`, `${address} lacks ${role}`, `Admin: grantRole(${role}, ${address}).`);
       else warn(`${label} role`, `${address} lacks ${role}`, `Admin: grantRole(${role}, ${address}).`);
@@ -222,7 +293,11 @@ async function checkAccounts(client, guard, config) {
 
   const approver = roles[1][2];
   if (approver && approver.toLowerCase() === executor.toLowerCase()) {
-    warn("Two-person rule", "executor and approver are the same account", "Use a different account as approver; the contract rejects self-approval.");
+    warn(
+      "Two-person rule",
+      "executor and approver are the same account",
+      "Use a different account as approver; the contract rejects self-approval.",
+    );
   }
 
   const payout = process.env.TREASURY_PAYOUT_ADDRESS ?? executor;
@@ -232,7 +307,12 @@ async function checkAccounts(client, guard, config) {
   }
   if (guard) {
     await check("Payout allowlist", async () => {
-      const allowed = await client.readContract({ address: guard, abi: guardAbi, functionName: "allowedRecipients", args: [payout] });
+      const allowed = await client.readContract({
+        address: guard,
+        abi: guardAbi,
+        functionName: "allowedRecipients",
+        args: [payout],
+      });
       if (allowed) pass("Payout allowlist", payout);
       else fail("Payout allowlist", `${payout} is not allowed`, `Admin: setRecipient(${payout}, true).`);
     });
@@ -240,16 +320,27 @@ async function checkAccounts(client, guard, config) {
   for (const token of config.tokens) {
     await check(`${token.symbol} association`, async () => {
       const associated = await isAssociated(payout, token.tokenId);
-      if (associated === undefined) warn(`${token.symbol} association`, "unknown (mirror node unreachable)", "Retry; unknown is not the same as not associated.");
+      if (associated === undefined)
+        warn(
+          `${token.symbol} association`,
+          "unknown (mirror node unreachable)",
+          "Retry; unknown is not the same as not associated.",
+        );
       else if (associated) pass(`${token.symbol} association`, "payout account is associated");
-      else fail(`${token.symbol} association`, "payout account is not associated", "Associate it in the app (Swap card) or with the HTS precompile before swapping.");
+      else
+        fail(
+          `${token.symbol} association`,
+          "payout account is not associated",
+          "Associate it in the app (Swap card) or with the HTS precompile before swapping.",
+        );
     });
   }
 
   await check("Gas balance", async () => {
     const balance = await client.getBalance({ address: executor });
     const hbar = Number(formatUnits(balance, 18));
-    if (hbar < 1) warn("Gas balance", `${hbar} HBAR on the executor`, "Fund the executor from the Hedera testnet faucet.");
+    if (hbar < 1)
+      warn("Gas balance", `${hbar} HBAR on the executor`, "Fund the executor from the Hedera testnet faucet.");
     else pass("Gas balance", `${hbar.toFixed(2)} HBAR on the executor`);
   });
 }
@@ -268,10 +359,13 @@ async function main() {
   });
   await checkNetwork(client);
 
-  const guardOk = guard && ADDRESS_RE.test(guard) ? await checkGuard(client, guard, config).catch(error => {
-    fail("Guard contract", error instanceof Error ? error.message.split("\n")[0] : String(error));
-    return false;
-  }) : false;
+  const guardOk =
+    guard && ADDRESS_RE.test(guard)
+      ? await checkGuard(client, guard, config).catch(error => {
+          fail("Guard contract", error instanceof Error ? error.message.split("\n")[0] : String(error));
+          return false;
+        })
+      : false;
   await checkAccounts(client, guardOk ? guard : undefined, config);
 
   for (const { status, name, detail, fix } of results) {

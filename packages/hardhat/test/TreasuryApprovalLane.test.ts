@@ -76,7 +76,9 @@ describe("TreasuryPolicyGuard approval lane", function () {
       const { guard, executor, path, recipient, minOutFor, deadline } = await loadFixture(deployFixture);
       const amountIn = 20n * HBAR;
       await expect(
-        guard.connect(executor).swapHbarForToken(path, recipient.address, amountIn, minOutFor(amountIn), await deadline()),
+        guard
+          .connect(executor)
+          .swapHbarForToken(path, recipient.address, amountIn, minOutFor(amountIn), await deadline()),
       )
         .to.be.revertedWithCustomError(guard, "ApprovalRequired")
         .withArgs(amountIn, THRESHOLD);
@@ -85,7 +87,9 @@ describe("TreasuryPolicyGuard approval lane", function () {
     it("still allows a swap at the threshold in one transaction", async function () {
       const { guard, executor, path, recipient, minOutFor, deadline } = await loadFixture(deployFixture);
       await expect(
-        guard.connect(executor).swapHbarForToken(path, recipient.address, THRESHOLD, minOutFor(THRESHOLD), await deadline()),
+        guard
+          .connect(executor)
+          .swapHbarForToken(path, recipient.address, THRESHOLD, minOutFor(THRESHOLD), await deadline()),
       ).to.emit(guard, "SwapExecuted");
     });
   });
@@ -96,7 +100,9 @@ describe("TreasuryPolicyGuard approval lane", function () {
         await loadFixture(deployFixture);
 
       await expect(propose()).to.emit(guard, "SwapProposed");
-      await expect(guard.connect(approver).approveSwap(1)).to.emit(guard, "SwapApproved").withArgs(1, approver.address, 1);
+      await expect(guard.connect(approver).approveSwap(1))
+        .to.emit(guard, "SwapApproved")
+        .withArgs(1, approver.address, 1);
       await expect(guard.connect(executor).executeSwap(1, path, await deadline()))
         .to.emit(guard, "ProposalExecuted")
         .withArgs(1, executor.address);
@@ -276,7 +282,9 @@ describe("TreasuryPolicyGuard approval lane", function () {
   describe("setApprovalPolicy", function () {
     it("is admin-only, emits an event and rejects zero approvals", async function () {
       const { guard, executor } = await loadFixture(deployFixture);
-      await expect(guard.setApprovalPolicy(5n * HBAR, 2)).to.emit(guard, "ApprovalPolicyUpdated").withArgs(5n * HBAR, 2);
+      await expect(guard.setApprovalPolicy(5n * HBAR, 2))
+        .to.emit(guard, "ApprovalPolicyUpdated")
+        .withArgs(5n * HBAR, 2);
       await expect(guard.setApprovalPolicy(5n * HBAR, 0)).to.be.revertedWithCustomError(guard, "InvalidApprovalPolicy");
       await expect(guard.connect(executor).setApprovalPolicy(1n, 1)).to.be.revertedWithCustomError(
         guard,
