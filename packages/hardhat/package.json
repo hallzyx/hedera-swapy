@@ -17,6 +17,7 @@
     "lint": "eslint",
     "lint-staged": "eslint",
     "test": "HEDERA_FORKING=true REPORT_GAS=true hardhat test",
+    "test:guard": "hardhat test test/TreasuryPolicyGuard.test.ts",
     "verify": "hardhat verify",
     "verify:testnet": "hardhat verify --network hederaTestnet",
     "verify:mainnet": "hardhat verify --network hederaMainnet"

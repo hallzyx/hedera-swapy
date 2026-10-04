@@ -22,6 +22,12 @@ test.describe("policy-gated swap UI", () => {
     await expect(page.getByTestId("swap-submit")).toContainText(/Connect wallet|Swap HBAR/);
   });
 
+  test("guard panel explains how to deploy when no address is configured", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("guard-setup")).toBeVisible();
+    await expect(page.getByTestId("guard-setup")).toContainText("TreasuryPolicyGuard");
+  });
+
   test("intent form fills the swap amount", async ({ page }) => {
     await page.goto("/");
     await page.getByTestId("intent-input").fill("swap 2 HBAR to SAUCE slippage 150 bps");
