@@ -146,7 +146,7 @@ async function main() {
   // 2. rejected swap: one tinybar above the per-swap maximum
   const tooBig = maxIn + HBAR;
   await send(
-    `Rejected swap of ${tooBig / HBAR} HBAR (above the per-swap maximum, refused by the contract)`,
+    `Rejected swap of ${tooBig / HBAR} HBAR (above the direct-lane limit, refused by the contract)`,
     executor,
     "swapHbarForToken",
     [path, recipient, tooBig, 1n, deadline()],
@@ -167,7 +167,13 @@ async function main() {
 
     await send(`Propose ${large / HBAR} HBAR`, executor, "proposeSwap", [path, recipient, large, minOut], "success");
     const id1 = await publicClient.readContract({ address: guard, abi: guardAbi, functionName: "proposalCount" });
-    await send(`Self-approval of proposal #${id1} is refused`, executor, "approveSwap", [id1], "reverted");
+    await send(
+      `Approval from the proposer's account (no approver role) is refused for proposal #${id1}`,
+      executor,
+      "approveSwap",
+      [id1],
+      "reverted",
+    );
     await send(`Approver signs proposal #${id1}`, approver, "approveSwap", [id1], "success");
     await send(`Execute proposal #${id1}`, executor, "executeSwap", [id1, path, deadline()], "success");
 
