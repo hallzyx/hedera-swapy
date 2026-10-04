@@ -72,6 +72,7 @@ yarn next:build
 yarn lint
 yarn hardhat:deploy --network hederaTestnet --tags TreasuryPolicyGuard
 yarn demo:swap            # needs SWAP_PRIVATE_KEY (UI-mode swap, no guard)
+yarn demo:guard           # needs TREASURY_GUARD_ADDRESS + SWAP_PRIVATE_KEY (+ APPROVER_PRIVATE_KEY): evidence table
 yarn e2e:policy           # Playwright policy UI
 yarn e2e:synpress         # Synpress + MetaMask when configured
 ```

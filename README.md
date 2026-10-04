@@ -159,7 +159,8 @@ Copy the `.env.example` files; never commit secrets.
 | `HCS_OPERATOR_ID` / `HCS_OPERATOR_KEY` | server env | Optional HCS receipt writer (pays the fees) |
 | `HCS_TOPIC_ID` | server env | Optional receipt topic |
 | `TREASURY_ADMIN`, `TREASURY_EXECUTOR`, `TREASURY_GUARDIAN`, `TREASURY_APPROVER`, `TREASURY_APPROVAL_THRESHOLD_HBAR`, `TREASURY_PAYOUT_ADDRESS`, `TREASURY_MIN_SAUCE_PER_HBAR` | shell, at deploy | Starter policy for `yarn hardhat:deploy` |
-| `SWAP_PRIVATE_KEY` | shell only | Headless `yarn demo:swap` (UI-mode swap, no guard) |
+| `SWAP_PRIVATE_KEY` | shell only | Headless `yarn demo:swap` (UI-mode swap, no guard) and `yarn demo:guard` (executor key) |
+| `TREASURY_GUARD_ADDRESS`, `APPROVER_PRIVATE_KEY`, `GUARDIAN_PRIVATE_KEY`, `ADMIN_PRIVATE_KEY` | shell only | `yarn demo:guard`: the last three are optional and default to the executor key (the approver is needed for the approval lane) |
 
 ## HCS audit trail (optional)
 
@@ -197,6 +198,8 @@ yarn e2e:policy   # Playwright UI checks (no MetaMask)
 ```
 
 ## Testnet evidence
+
+Guard evidence is produced by `yarn demo:guard`: it sends an approved swap, a swap the contract rejects, an approve-then-execute proposal, a vetoed proposal and a pause, then prints a table of HashScan links. Paste that table here after running it. Nothing in this repository claims a guard transaction that has not been run.
 
 UI-mode swap (MetaMask, Hedera testnet). Full table: [TESTNET_EVIDENCE.md](./TESTNET_EVIDENCE.md).
 

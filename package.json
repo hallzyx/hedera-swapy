@@ -40,6 +40,7 @@
     "next:start": "yarn workspace @sh/nextjs start",
     "next:test": "yarn workspace @sh/nextjs test",
     "demo:swap": "node packages/nextjs/scripts/demo-swap.mjs",
+    "demo:guard": "node packages/nextjs/scripts/demo-guard.mjs",
     "e2e:policy": "yarn workspace @sh/nextjs e2e:policy",
     "e2e:synpress": "yarn workspace @sh/nextjs e2e:synpress",
     "postinstall": "husky",
