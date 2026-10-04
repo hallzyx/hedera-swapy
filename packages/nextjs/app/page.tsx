@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { NextPage } from "next";
+import { AuditTrail } from "~~/components/saucerswap/AuditTrail";
 import { IntentForm } from "~~/components/saucerswap/IntentForm";
 import { SwapCard } from "~~/components/saucerswap/SwapCard";
 import { TreasuryGuardCard } from "~~/components/saucerswap/TreasuryGuardCard";
@@ -42,6 +43,8 @@ const Home: NextPage = () => {
         />
 
         <TreasuryGuardCard amount={amount} slippageBps={slippageBps} />
+
+        <AuditTrail />
 
         <div className="bg-base-100 rounded-2xl border border-base-300 p-6" data-testid="policy-panel">
           <h3 className="font-bold text-lg mb-3">Browser pre-flight policy</h3>

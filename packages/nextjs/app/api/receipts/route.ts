@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import { AccountId, Client, PrivateKey, TopicMessageSubmitTransaction } from "@hiero-ledger/sdk";
+import { toFunctionSelector } from "viem";
 import { createRateLimiter } from "~~/utils/rateLimit";
-import { type MirrorContractResult, SAUCERSWAP_TESTNET, TX_HASH_RE, verifySwapReceipt } from "~~/utils/saucerswap";
+import {
+  GUARD_SWAP_SIGNATURES,
+  type GuardReceiptRule,
+  type MirrorContractResult,
+  SAUCERSWAP_TESTNET,
+  TX_HASH_RE,
+  verifySwapReceipt,
+} from "~~/utils/saucerswap";
 
 export const runtime = "nodejs";
 
 type ReceiptBody = {
   swapTxHash?: string;
-  amountOutMinimum?: string;
 };
 
 // Per-instance protection: 10 receipt writes per minute per client, and each tx is written once.
@@ -23,6 +30,11 @@ function clientKey(request: Request): string {
 function allowedTargets(): string[] {
   const guard = process.env.NEXT_PUBLIC_TREASURY_GUARD_ADDRESS;
   return guard ? [SAUCERSWAP_TESTNET.swapRouter, guard] : [SAUCERSWAP_TESTNET.swapRouter];
+}
+
+function guardRule(): GuardReceiptRule | undefined {
+  const guard = process.env.NEXT_PUBLIC_TREASURY_GUARD_ADDRESS;
+  return guard ? { address: guard, selectors: GUARD_SWAP_SIGNATURES.map(sig => toFunctionSelector(sig)) } : undefined;
 }
 
 /**
@@ -87,7 +99,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Mirror node is unreachable." }, { status: 502 });
   }
 
-  const verdict = verifySwapReceipt(mirrorResult, allowedTargets());
+  const verdict = verifySwapReceipt(mirrorResult, allowedTargets(), guardRule());
   if (!verdict.ok) {
     return NextResponse.json({ ok: false, message: verdict.reason }, { status: 422 });
   }
@@ -98,7 +110,6 @@ export async function POST(request: Request) {
     payer: verdict.payer,
     target: verdict.target,
     amountInTinybars: verdict.amountInTinybars,
-    amountOutMinimum: body.amountOutMinimum ?? null,
     tokenOut: SAUCERSWAP_TESTNET.tokenIds.sauce,
     network: "testnet",
     timestamp: new Date().toISOString(),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type Address, BaseError, ContractFunctionRevertedError, type Hex, formatUnits } from "viem";
 import { useAccount, useBalance, usePublicClient, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { GuardProposals } from "~~/components/saucerswap/GuardProposals";
@@ -13,6 +13,7 @@ import {
   hashscanTxUrl,
   parseHbarToTinybars,
   quoteExactInputHbarToSauce,
+  requestReceipt,
   treasuryGuardAbi,
 } from "~~/utils/saucerswap";
 
@@ -66,6 +67,15 @@ const GuardPanel = ({ guard, amount, slippageBps }: TreasuryGuardCardProps & { g
   });
 
   const base = { address: guard, abi: treasuryGuardAbi, chainId: SAUCERSWAP_TESTNET.chainId } as const;
+
+  // Only direct swaps move HBAR in this transaction; a proposal is not a swap yet and gets no receipt.
+  const swapHash = useRef<Hex | null>(null);
+  useEffect(() => {
+    if (isConfirmed && txHash && swapHash.current === txHash) {
+      swapHash.current = null;
+      requestReceipt(txHash);
+    }
+  }, [isConfirmed, txHash]);
 
   const { data: policyData } = useReadContracts({
     contracts: [
@@ -144,6 +154,7 @@ const GuardPanel = ({ guard, amount, slippageBps }: TreasuryGuardCardProps & { g
       // Dry-run first so a rejection is explained before the wallet prompt.
       await publicClient.simulateContract({ ...call, account: address });
       const hash = await writeContractAsync({ ...call, gas: 2_000_000n });
+      swapHash.current = needsApproval ? null : hash;
       setTxHash(hash);
       setStatus(
         needsApproval

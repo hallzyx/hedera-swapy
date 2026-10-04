@@ -212,6 +212,12 @@ export const treasuryGuardAbi = [
   { type: "error", name: "PathMismatch", inputs: [{ name: "id", type: "uint256" }] },
 ] as const;
 
+/** Function signatures whose successful execution moves treasury HBAR; only these get an HCS receipt. */
+export const GUARD_SWAP_SIGNATURES = [
+  "swapHbarForToken(bytes,address,uint256,uint256,uint256)",
+  "executeSwap(uint256,bytes,uint256)",
+] as const;
+
 /** Plain-language reasons for the guard's custom errors, shown in the UI. */
 export function describeGuardError(name: string | undefined): string {
   switch (name) {

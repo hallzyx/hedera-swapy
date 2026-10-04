@@ -26,6 +26,37 @@ describe("verifySwapReceipt", () => {
     expect(verdict.ok).toBe(true);
   });
 
+  describe("treasury guard calls", () => {
+    const guard = "0x00000000000000000000000000000000000000Ab";
+    const rule = { address: guard, selectors: ["0xaabbccdd"] };
+    const call = (functionParameters: string) => ({
+      result: "SUCCESS",
+      from: sender,
+      to: guard.toLowerCase(),
+      amount: 0,
+      function_parameters: functionParameters,
+    });
+
+    it("accepts a swap call and reports no amount (the HBAR leaves the guard internally)", () => {
+      expect(verifySwapReceipt(call("0xAABBCCDD0000"), [router, guard], rule)).toEqual({
+        ok: true,
+        payer: sender.toLowerCase(),
+        target: guard.toLowerCase(),
+        amountInTinybars: null,
+      });
+    });
+
+    it("rejects other guard calls such as pause or approve", () => {
+      expect(verifySwapReceipt(call("0x8456cb59"), [router, guard], rule).ok).toBe(false);
+      expect(verifySwapReceipt({ ...call("0x"), function_parameters: null }, [router, guard], rule).ok).toBe(false);
+    });
+
+    it("leaves router calls untouched", () => {
+      const routerCall = { result: "SUCCESS", from: sender, to: router, amount: 5 };
+      expect(verifySwapReceipt(routerCall, [router, guard], rule).ok).toBe(true);
+    });
+  });
+
   it("rejects missing, failed or misdirected transactions", () => {
     expect(verifySwapReceipt(null, [router]).ok).toBe(false);
     expect(verifySwapReceipt({ result: "CONTRACT_REVERT_EXECUTED", from: sender, to: router }, [router]).ok).toBe(false);

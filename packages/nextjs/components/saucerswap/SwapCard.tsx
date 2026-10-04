@@ -16,6 +16,7 @@ import {
   isSauceAssociated,
   parseHbarToTinybars,
   quoteExactInputHbarToSauce,
+  requestReceipt,
 } from "~~/utils/saucerswap";
 
 type QuoteState = {
@@ -40,7 +41,6 @@ export const SwapCard = ({ amount, slippageBps, onAmountChange, onSlippageChange
   const [assocTxHash, setAssocTxHash] = useState<Hex | null>(null);
   const [swapTxHash, setSwapTxHash] = useState<Hex | null>(null);
   const receiptSentFor = useRef<Hex | null>(null);
-  const swapDetails = useRef<{ amountInTinybars: string; amountOutMinimum: string } | null>(null);
   const lastTxHash = swapTxHash ?? assocTxHash;
 
   const { sendTransactionAsync, isPending: isSending } = useSendTransaction();
@@ -116,17 +116,7 @@ export const SwapCard = ({ amount, slippageBps, onAmountChange, onSlippageChange
   useEffect(() => {
     if (!isConfirmed || !swapTxHash || !address || receiptSentFor.current === swapTxHash) return;
     receiptSentFor.current = swapTxHash;
-    void fetch("/api/receipts", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        swapTxHash,
-        payer: address,
-        amountInTinybars: swapDetails.current?.amountInTinybars,
-        amountOutMinimum: swapDetails.current?.amountOutMinimum,
-        tokenOut: SAUCERSWAP_TESTNET.tokenIds.sauce,
-      }),
-    }).catch(() => undefined);
+    requestReceipt(swapTxHash);
   }, [isConfirmed, swapTxHash, address]);
 
   const fetchQuote = useCallback(async () => {
@@ -221,10 +211,6 @@ export const SwapCard = ({ amount, slippageBps, onAmountChange, onSlippageChange
         value: call.value,
         gas: 2_000_000n,
       });
-      swapDetails.current = {
-        amountInTinybars: tinybars.toString(),
-        amountOutMinimum: call.amountOutMinimum.toString(),
-      };
       setSwapTxHash(hash);
       setStatus("Swap submitted. Waiting for confirmation…");
     } catch (error) {

@@ -7,4 +7,5 @@ export * from "./path";
 export * from "./policy";
 export * from "./quote";
 export * from "./receipt";
+export * from "./receiptClient";
 export * from "./swap";

@@ -44,7 +44,7 @@ This document says what each account can do, what it cannot do, and what the con
 - **Approvals are counted per account, not per person.** Giving one human two approver accounts defeats the two-person rule.
 - **The daily cap uses UTC days**, so the limit can be used twice around midnight UTC (once before, once after).
 - **No timelock on admin changes.** A compromised admin acts immediately.
-- **HCS receipts are an audit aid, not a control.** They are written by a server operator account after the mirror node confirms the transaction.
+- **HCS receipts are an audit aid, not a control.** They are written by a server operator account after the mirror node confirms the transaction. For the guard, only `swapHbarForToken` and `executeSwap` calls qualify, and the receipt carries no amount (the tx value is zero; read the `SwapExecuted` event for it).
 - **The browser policy is a convenience.** Only the contract enforces anything. In UI mode (no guard) nothing on-chain restricts the wallet.
 - **Unverified build.** Contract tests run on an in-memory chain with a mock router. Real SaucerSwap behaviour was only exercised in UI mode (see `TESTNET_EVIDENCE.md`).
 

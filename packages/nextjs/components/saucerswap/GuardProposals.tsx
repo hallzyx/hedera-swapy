@@ -9,6 +9,7 @@ import {
   formatSauce,
   formatTinybars,
   hashscanTxUrl,
+  requestReceipt,
   treasuryGuardAbi,
 } from "~~/utils/saucerswap";
 import { encodeV2Path } from "~~/utils/saucerswap/path";
@@ -81,6 +82,8 @@ export const GuardProposals = ({ guard, required }: { guard: Address; required: 
       const hash = await writeContractAsync({ ...call, gas: 2_000_000n });
       setTxHash(hash);
       setMessage("Submitted. The list refreshes once the transaction is confirmed.");
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status === "success" && action === "executeSwap") requestReceipt(hash);
       void refetchCount();
       void refetchProposals();
     } catch (error) {
