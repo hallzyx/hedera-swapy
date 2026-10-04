@@ -14,7 +14,13 @@ import { ISaucerSwapRouter } from "./interfaces/ISaucerSwapRouter.sol";
 ///  - DEFAULT_ADMIN_ROLE: sets limits, token rules and payout recipients, unpauses, withdraws.
 ///                        Meant to be a DAO multisig or governance account.
 ///  - EXECUTOR_ROLE:      may run swaps that satisfy the policy (treasurer / ops account).
-///  - GUARDIAN_ROLE:      may only pause (fast incident response). Admin can pause too.
+///  - GUARDIAN_ROLE:      may pause and veto pending proposals (fast incident response). Admin can too.
+///  - APPROVER_ROLE:      second signer for large swaps (two-person rule, never the proposer).
+///
+/// Two lanes
+///  - Direct lane:   swaps up to `approvalPolicy.threshold` run in one transaction by an executor.
+///  - Approval lane: larger swaps are proposed by an executor, approved by `approvalPolicy.required`
+///                   distinct approvers, and can be vetoed by a guardian until they execute.
 ///
 /// Policy enforced on every swap
 ///  - amountIn within [minAmountIn, maxAmountIn] and the rolling UTC-day total within dailyCap
@@ -28,9 +34,13 @@ import { ISaucerSwapRouter } from "./interfaces/ISaucerSwapRouter.sol";
 contract TreasuryPolicyGuard is AccessControl, Pausable, ReentrancyGuard {
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
     bytes32 public constant GUARDIAN_ROLE = keccak256("GUARDIAN_ROLE");
+    bytes32 public constant APPROVER_ROLE = keccak256("APPROVER_ROLE");
 
     /// Longest allowed gap between now and a swap deadline.
     uint256 public constant MAX_DEADLINE_WINDOW = 1 hours;
+
+    /// How long a proposal can collect approvals before it expires.
+    uint256 public constant PROPOSAL_TTL = 1 days;
 
     /// tokenIn (20 bytes) | fee (3 bytes) | tokenOut (20 bytes)
     uint256 private constant SINGLE_HOP_PATH_LENGTH = 43;
@@ -50,6 +60,39 @@ contract TreasuryPolicyGuard is AccessControl, Pausable, ReentrancyGuard {
         uint256 minOutPerHbar;
     }
 
+    enum ProposalStatus {
+        None,
+        Pending,
+        Executed,
+        Vetoed
+    }
+
+    struct ApprovalPolicy {
+        /// Swaps above this many tinybars must go through propose / approve / execute.
+        uint256 threshold;
+        /// Distinct approvers (other than the proposer) needed before execution.
+        uint8 required;
+    }
+
+    struct Proposal {
+        address proposer;
+        address recipient;
+        uint64 expiresAt;
+        uint8 approvals;
+        ProposalStatus status;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+        bytes32 pathHash;
+    }
+
+    /// Parameters of one swap, grouped to keep stack usage low.
+    struct Swap {
+        address recipient;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+        uint256 deadline;
+    }
+
     ISaucerSwapRouter public immutable router;
     address public immutable whbar;
 
@@ -58,11 +101,29 @@ contract TreasuryPolicyGuard is AccessControl, Pausable, ReentrancyGuard {
     mapping(address recipient => bool allowed) public allowedRecipients;
     mapping(uint256 utcDay => uint256 spent) public spentOnDay;
 
+    /// Disabled by default (threshold = max): every swap uses the direct lane until the admin sets it.
+    ApprovalPolicy public approvalPolicy = ApprovalPolicy({ threshold: type(uint256).max, required: 1 });
+    uint256 public proposalCount;
+    mapping(uint256 id => Proposal proposal) public proposals;
+    mapping(uint256 id => mapping(address approver => bool approved)) public approvedBy;
+
     event Funded(address indexed from, uint256 amount);
     event LimitsUpdated(uint256 minAmountIn, uint256 maxAmountIn, uint256 dailyCap);
     event TokenRuleUpdated(address indexed token, bool allowed, uint256 minOutPerHbar);
     event RecipientUpdated(address indexed recipient, bool allowed);
     event Withdrawn(address indexed to, uint256 amount);
+    event ApprovalPolicyUpdated(uint256 threshold, uint8 required);
+    event SwapProposed(
+        uint256 indexed id,
+        address indexed proposer,
+        address indexed recipient,
+        uint256 amountIn,
+        uint256 amountOutMinimum,
+        uint256 expiresAt
+    );
+    event SwapApproved(uint256 indexed id, address indexed approver, uint8 approvals);
+    event SwapVetoed(uint256 indexed id, address indexed by);
+    event ProposalExecuted(uint256 indexed id, address indexed executor);
     event SwapExecuted(
         address indexed executor,
         address indexed recipient,
@@ -86,6 +147,15 @@ contract TreasuryPolicyGuard is AccessControl, Pausable, ReentrancyGuard {
     error InsufficientTreasury(uint256 balance, uint256 required);
     error OutputBelowMinimum(uint256 amountOut, uint256 amountOutMinimum);
     error TransferFailed();
+    error ApprovalRequired(uint256 amountIn, uint256 threshold);
+    error InvalidApprovalPolicy();
+    error UnknownProposal(uint256 id);
+    error ProposalNotPending(uint256 id);
+    error ProposalExpired(uint256 id);
+    error SelfApproval(uint256 id);
+    error AlreadyApproved(uint256 id, address approver);
+    error NotEnoughApprovals(uint256 id, uint8 approvals, uint8 required);
+    error PathMismatch(uint256 id);
 
     constructor(address admin, address router_, address whbar_, Limits memory initialLimits) {
         if (admin == address(0) || router_ == address(0) || whbar_ == address(0)) revert ZeroAddress();
@@ -117,13 +187,73 @@ contract TreasuryPolicyGuard is AccessControl, Pausable, ReentrancyGuard {
         uint256 amountOutMinimum,
         uint256 deadline
     ) external onlyRole(EXECUTOR_ROLE) whenNotPaused nonReentrant returns (uint256 amountOut) {
-        address tokenOut = _tokenOutOf(path);
-        _enforcePolicy(tokenOut, recipient, amountIn, amountOutMinimum, deadline);
-        uint256 utcDay = _recordSpend(amountIn);
+        uint256 threshold = approvalPolicy.threshold;
+        if (amountIn > threshold) revert ApprovalRequired(amountIn, threshold);
+        amountOut = _execute(path, Swap(recipient, amountIn, amountOutMinimum, deadline));
+    }
 
-        amountOut = _routeSwap(path, recipient, amountIn, amountOutMinimum, deadline);
+    // ---------------------------------------------------------------------
+    // Approval lane (two-person rule for large swaps)
+    // ---------------------------------------------------------------------
 
-        emit SwapExecuted(msg.sender, recipient, tokenOut, amountIn, amountOutMinimum, amountOut, utcDay);
+    /// Step 1: an executor proposes a swap. The policy is checked now so bad proposals fail fast,
+    /// and checked again when the swap executes (limits and allowlists may have changed).
+    function proposeSwap(
+        bytes calldata path,
+        address recipient,
+        uint256 amountIn,
+        uint256 amountOutMinimum
+    ) external onlyRole(EXECUTOR_ROLE) whenNotPaused returns (uint256 id) {
+        _enforcePolicy(_tokenOutOf(path), recipient, amountIn, amountOutMinimum);
+
+        id = ++proposalCount;
+        uint64 expiresAt = uint64(block.timestamp + PROPOSAL_TTL);
+        proposals[id] = Proposal({
+            proposer: msg.sender,
+            recipient: recipient,
+            expiresAt: expiresAt,
+            approvals: 0,
+            status: ProposalStatus.Pending,
+            amountIn: amountIn,
+            amountOutMinimum: amountOutMinimum,
+            pathHash: keccak256(path)
+        });
+        emit SwapProposed(id, msg.sender, recipient, amountIn, amountOutMinimum, expiresAt);
+    }
+
+    /// Step 2: an approver other than the proposer signs off.
+    function approveSwap(uint256 id) external onlyRole(APPROVER_ROLE) whenNotPaused {
+        Proposal storage proposal = _pendingProposal(id);
+        if (proposal.proposer == msg.sender) revert SelfApproval(id);
+        if (approvedBy[id][msg.sender]) revert AlreadyApproved(id, msg.sender);
+        approvedBy[id][msg.sender] = true;
+        proposal.approvals += 1;
+        emit SwapApproved(id, msg.sender, proposal.approvals);
+    }
+
+    /// A guardian or the admin can cancel a pending proposal at any time, even while paused.
+    function vetoSwap(uint256 id) external {
+        _requireGuardianOrAdmin();
+        Proposal storage proposal = _pendingProposal(id);
+        proposal.status = ProposalStatus.Vetoed;
+        emit SwapVetoed(id, msg.sender);
+    }
+
+    /// Step 3: once enough approvals are in, an executor runs the stored swap.
+    /// @param path Must hash to the path committed at proposal time.
+    function executeSwap(
+        uint256 id,
+        bytes calldata path,
+        uint256 deadline
+    ) external onlyRole(EXECUTOR_ROLE) whenNotPaused nonReentrant returns (uint256 amountOut) {
+        Proposal storage proposal = _pendingProposal(id);
+        if (keccak256(path) != proposal.pathHash) revert PathMismatch(id);
+        uint8 required = approvalPolicy.required;
+        if (proposal.approvals < required) revert NotEnoughApprovals(id, proposal.approvals, required);
+
+        proposal.status = ProposalStatus.Executed;
+        amountOut = _execute(path, Swap(proposal.recipient, proposal.amountIn, proposal.amountOutMinimum, deadline));
+        emit ProposalExecuted(id, msg.sender);
     }
 
     /// Tinybars still spendable today under the daily cap.
@@ -146,6 +276,13 @@ contract TreasuryPolicyGuard is AccessControl, Pausable, ReentrancyGuard {
         emit TokenRuleUpdated(token, allowed, minOutPerHbar);
     }
 
+    /// Swaps above `threshold` tinybars need `required` approvals. Use type(uint256).max to disable the lane.
+    function setApprovalPolicy(uint256 threshold, uint8 required) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (required == 0) revert InvalidApprovalPolicy();
+        approvalPolicy = ApprovalPolicy({ threshold: threshold, required: required });
+        emit ApprovalPolicyUpdated(threshold, required);
+    }
+
     function setRecipient(address recipient, bool allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (recipient == address(0)) revert ZeroAddress();
         allowedRecipients[recipient] = allowed;
@@ -154,7 +291,7 @@ contract TreasuryPolicyGuard is AccessControl, Pausable, ReentrancyGuard {
 
     /// Guardians and admins can halt swaps immediately.
     function pause() external {
-        if (!hasRole(GUARDIAN_ROLE, msg.sender) && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert NotGuardian();
+        _requireGuardianOrAdmin();
         _pause();
     }
 
@@ -176,6 +313,37 @@ contract TreasuryPolicyGuard is AccessControl, Pausable, ReentrancyGuard {
     // Internals
     // ---------------------------------------------------------------------
 
+    function _requireGuardianOrAdmin() private view {
+        if (!hasRole(GUARDIAN_ROLE, msg.sender) && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert NotGuardian();
+    }
+
+    function _pendingProposal(uint256 id) private view returns (Proposal storage proposal) {
+        proposal = proposals[id];
+        if (proposal.status == ProposalStatus.None) revert UnknownProposal(id);
+        if (proposal.status != ProposalStatus.Pending) revert ProposalNotPending(id);
+        if (block.timestamp > proposal.expiresAt) revert ProposalExpired(id);
+    }
+
+    /// Policy, spend booking and routing shared by the direct and approval lanes.
+    function _execute(bytes calldata path, Swap memory swap) private returns (uint256 amountOut) {
+        address tokenOut = _tokenOutOf(path);
+        _enforcePolicy(tokenOut, swap.recipient, swap.amountIn, swap.amountOutMinimum);
+        _checkDeadline(swap.deadline);
+        uint256 utcDay = _recordSpend(swap.amountIn);
+
+        amountOut = _routeSwap(path, swap);
+
+        emit SwapExecuted(
+            msg.sender,
+            swap.recipient,
+            tokenOut,
+            swap.amountIn,
+            swap.amountOutMinimum,
+            amountOut,
+            utcDay
+        );
+    }
+
     /// Checks the daily cap and treasury balance, then books the spend before any external call.
     function _recordSpend(uint256 amountIn) private returns (uint256 utcDay) {
         utcDay = block.timestamp / 1 days;
@@ -186,28 +354,22 @@ contract TreasuryPolicyGuard is AccessControl, Pausable, ReentrancyGuard {
     }
 
     /// Calls SaucerSwap `multicall([exactInput, refundETH])`, forwarding exactly `amountIn` tinybars.
-    function _routeSwap(
-        bytes calldata path,
-        address recipient,
-        uint256 amountIn,
-        uint256 amountOutMinimum,
-        uint256 deadline
-    ) private returns (uint256 amountOut) {
+    function _routeSwap(bytes calldata path, Swap memory swap) private returns (uint256 amountOut) {
         ISaucerSwapRouter.ExactInputParams memory params = ISaucerSwapRouter.ExactInputParams({
             path: path,
-            recipient: recipient,
-            deadline: deadline,
-            amountIn: amountIn,
-            amountOutMinimum: amountOutMinimum
+            recipient: swap.recipient,
+            deadline: swap.deadline,
+            amountIn: swap.amountIn,
+            amountOutMinimum: swap.amountOutMinimum
         });
 
         bytes[] memory calls = new bytes[](2);
         calls[0] = abi.encodeCall(ISaucerSwapRouter.exactInput, (params));
         calls[1] = abi.encodeCall(ISaucerSwapRouter.refundETH, ());
 
-        bytes[] memory results = router.multicall{ value: amountIn }(calls);
+        bytes[] memory results = router.multicall{ value: swap.amountIn }(calls);
         amountOut = abi.decode(results[0], (uint256));
-        if (amountOut < amountOutMinimum) revert OutputBelowMinimum(amountOut, amountOutMinimum);
+        if (amountOut < swap.amountOutMinimum) revert OutputBelowMinimum(amountOut, swap.amountOutMinimum);
     }
 
     function _setLimits(Limits memory newLimits) private {
@@ -232,8 +394,7 @@ contract TreasuryPolicyGuard is AccessControl, Pausable, ReentrancyGuard {
         address tokenOut,
         address recipient,
         uint256 amountIn,
-        uint256 amountOutMinimum,
-        uint256 deadline
+        uint256 amountOutMinimum
     ) private view {
         Limits memory l = limits;
         if (amountIn < l.minAmountIn || amountIn > l.maxAmountIn) {
@@ -249,7 +410,9 @@ contract TreasuryPolicyGuard is AccessControl, Pausable, ReentrancyGuard {
         if (amountOutMinimum == 0 || amountOutMinimum < requiredMinimum) {
             revert PriceFloorViolated(amountOutMinimum, requiredMinimum);
         }
+    }
 
+    function _checkDeadline(uint256 deadline) private view {
         if (deadline < block.timestamp || deadline > block.timestamp + MAX_DEADLINE_WINDOW) {
             revert DeadlineOutOfRange(deadline);
         }

@@ -57,6 +57,70 @@ export const treasuryGuardAbi = [
     ],
     outputs: [{ name: "amountOut", type: "uint256" }],
   },
+  {
+    type: "function",
+    name: "approvalPolicy",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [
+      { name: "threshold", type: "uint256" },
+      { name: "required", type: "uint8" },
+    ],
+  },
+  { type: "function", name: "proposalCount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  {
+    type: "function",
+    name: "proposals",
+    stateMutability: "view",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [
+      { name: "proposer", type: "address" },
+      { name: "recipient", type: "address" },
+      { name: "expiresAt", type: "uint64" },
+      { name: "approvals", type: "uint8" },
+      { name: "status", type: "uint8" },
+      { name: "amountIn", type: "uint256" },
+      { name: "amountOutMinimum", type: "uint256" },
+      { name: "pathHash", type: "bytes32" },
+    ],
+  },
+  {
+    type: "function",
+    name: "proposeSwap",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "path", type: "bytes" },
+      { name: "recipient", type: "address" },
+      { name: "amountIn", type: "uint256" },
+      { name: "amountOutMinimum", type: "uint256" },
+    ],
+    outputs: [{ name: "id", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "approveSwap",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "vetoSwap",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "executeSwap",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "id", type: "uint256" },
+      { name: "path", type: "bytes" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [{ name: "amountOut", type: "uint256" }],
+  },
   { type: "error", name: "ZeroAddress", inputs: [] },
   { type: "error", name: "InvalidLimits", inputs: [] },
   { type: "error", name: "NotGuardian", inputs: [] },
@@ -115,6 +179,37 @@ export const treasuryGuardAbi = [
     ],
   },
   { type: "error", name: "TransferFailed", inputs: [] },
+  { type: "error", name: "InvalidApprovalPolicy", inputs: [] },
+  {
+    type: "error",
+    name: "ApprovalRequired",
+    inputs: [
+      { name: "amountIn", type: "uint256" },
+      { name: "threshold", type: "uint256" },
+    ],
+  },
+  { type: "error", name: "UnknownProposal", inputs: [{ name: "id", type: "uint256" }] },
+  { type: "error", name: "ProposalNotPending", inputs: [{ name: "id", type: "uint256" }] },
+  { type: "error", name: "ProposalExpired", inputs: [{ name: "id", type: "uint256" }] },
+  { type: "error", name: "SelfApproval", inputs: [{ name: "id", type: "uint256" }] },
+  {
+    type: "error",
+    name: "AlreadyApproved",
+    inputs: [
+      { name: "id", type: "uint256" },
+      { name: "approver", type: "address" },
+    ],
+  },
+  {
+    type: "error",
+    name: "NotEnoughApprovals",
+    inputs: [
+      { name: "id", type: "uint256" },
+      { name: "approvals", type: "uint8" },
+      { name: "required", type: "uint8" },
+    ],
+  },
+  { type: "error", name: "PathMismatch", inputs: [{ name: "id", type: "uint256" }] },
 ] as const;
 
 /** Plain-language reasons for the guard's custom errors, shown in the UI. */
@@ -138,6 +233,24 @@ export function describeGuardError(name: string | undefined): string {
       return "The treasury is paused by a guardian.";
     case "AccessControlUnauthorizedAccount":
       return "Your wallet does not have the executor role on this treasury.";
+    case "ApprovalRequired":
+      return "This amount is above the direct limit. Propose it and ask an approver to sign off.";
+    case "SelfApproval":
+      return "The proposer cannot approve their own proposal.";
+    case "AlreadyApproved":
+      return "This approver has already signed this proposal.";
+    case "NotEnoughApprovals":
+      return "The proposal does not have enough approvals yet.";
+    case "ProposalExpired":
+      return "The proposal expired before it was executed.";
+    case "ProposalNotPending":
+      return "The proposal was already executed or vetoed.";
+    case "UnknownProposal":
+      return "No proposal with that id.";
+    case "PathMismatch":
+      return "The path does not match the one committed in the proposal.";
+    case "NotGuardian":
+      return "Only a guardian or the admin can do this.";
     case "InvalidPath":
       return "The swap path is not a single hop from WHBAR.";
     default:

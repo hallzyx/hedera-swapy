@@ -13,7 +13,8 @@ Treasurers and ops leads of DAOs, grant programs and small teams who share the s
 | Cap what one swap can move, and what a day can move | `minAmountIn`, `maxAmountIn`, `dailyCap` in `TreasuryPolicyGuard` |
 | Only convert into approved tokens | per-token allowlist, with a **price floor** (minimum output per HBAR) |
 | Tokens may only land on approved accounts | payout-recipient allowlist |
-| The person who swaps is not the person who sets the rules | `EXECUTOR_ROLE` swaps, `DEFAULT_ADMIN_ROLE` configures, `GUARDIAN_ROLE` can only pause |
+| The person who swaps is not the person who sets the rules | `EXECUTOR_ROLE` swaps, `DEFAULT_ADMIN_ROLE` configures, `GUARDIAN_ROLE` can only pause and veto |
+| Large swaps need a second person | approval lane: an executor proposes, an `APPROVER_ROLE` account (never the proposer) signs, a guardian can veto |
 | Stop everything fast | `pause()` by a guardian, `unpause()` only by the admin |
 | Prove what happened | `SwapExecuted` events plus optional HCS receipts verified against the mirror node |
 
@@ -90,6 +91,7 @@ Starter policy applied by the script (change it with the admin account at any ti
 | Recipient | `TREASURY_PAYOUT_ADDRESS` (default: deployer) |
 | Path | single hop WHBAR -> allowed token |
 | Deadline | at most 1 hour ahead |
+| Approval lane | off unless `TREASURY_APPROVER` is set; then swaps above `TREASURY_APPROVAL_THRESHOLD_HBAR` (default 10) need 1 approver, proposals expire after 24 h |
 
 To split roles, set `TREASURY_ADMIN` (for example a multisig) and `TREASURY_EXECUTOR` before deploying. When the admin is not the deployer the script only deploys and prints the three admin calls to make.
 
@@ -102,6 +104,8 @@ yarn hardhat:test:guard   # in-memory chain, no network needed
 The suite uses a mock router and covers role checks, amount and daily limits (including the UTC-day reset), token and recipient allowlists, path validation, the price floor, deadlines, pause behaviour, failed-router rollback and admin withdrawals.
 
 ## Architecture
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the flows and [SECURITY.md](SECURITY.md) for what each role can and cannot do.
 
 | Piece | Role |
 | --- | --- |
@@ -116,7 +120,8 @@ The suite uses a mock router and covers role checks, amount and daily limits (in
 | `packages/nextjs/utils/saucerswap/guardAbi.ts` | Guard ABI + readable revert reasons |
 | `packages/nextjs/utils/saucerswap/receipt.ts` | Pure mirror-result verification for receipts |
 | `packages/nextjs/components/saucerswap/SwapCard.tsx` | UI mode swap card |
-| `packages/nextjs/components/saucerswap/TreasuryGuardCard.tsx` | Guard panel: live policy + guarded swap |
+| `packages/nextjs/components/saucerswap/TreasuryGuardCard.tsx` | Guard panel: live policy + guarded swap or proposal |
+| `packages/nextjs/components/saucerswap/GuardProposals.tsx` | Approve, execute and veto proposals |
 | `packages/nextjs/app/api/receipts/route.ts` | Verified, rate-limited HCS receipt writer |
 
 ### Testnet addresses (official SaucerSwap deployments)
@@ -153,7 +158,7 @@ Copy the `.env.example` files; never commit secrets.
 | `NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID` | `packages/nextjs/.env.local` | RainbowKit WalletConnect |
 | `HCS_OPERATOR_ID` / `HCS_OPERATOR_KEY` | server env | Optional HCS receipt writer (pays the fees) |
 | `HCS_TOPIC_ID` | server env | Optional receipt topic |
-| `TREASURY_ADMIN`, `TREASURY_EXECUTOR`, `TREASURY_PAYOUT_ADDRESS`, `TREASURY_MIN_SAUCE_PER_HBAR` | shell, at deploy | Starter policy for `yarn hardhat:deploy` |
+| `TREASURY_ADMIN`, `TREASURY_EXECUTOR`, `TREASURY_GUARDIAN`, `TREASURY_APPROVER`, `TREASURY_APPROVAL_THRESHOLD_HBAR`, `TREASURY_PAYOUT_ADDRESS`, `TREASURY_MIN_SAUCE_PER_HBAR` | shell, at deploy | Starter policy for `yarn hardhat:deploy` |
 | `SWAP_PRIVATE_KEY` | shell only | Headless `yarn demo:swap` (UI-mode swap, no guard) |
 
 ## HCS audit trail (optional)

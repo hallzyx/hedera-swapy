@@ -12,7 +12,7 @@ Target user: a treasurer or ops lead of a DAO or small team converting treasury 
 
 **In scope**
 
-- `TreasuryPolicyGuard.sol`: per-swap and daily limits, token allowlist with price floor, payout-recipient allowlist, executor / admin / guardian roles, pause
+- `TreasuryPolicyGuard.sol`: per-swap and daily limits, token allowlist with price floor, payout-recipient allowlist, executor / admin / guardian / approver roles, approval lane (propose, approve, veto, execute), pause
 - QuoterV2 `quoteExactInput` (read-only) and SwapRouter V2 `multicall([exactInput, refundETH])`
 - Pure browser pre-flight policy in `packages/nextjs/utils/saucerswap/policy.ts`
 - HTS `associateToken` via precompile `0x167`
@@ -67,7 +67,7 @@ Use **RainbowKit + wagmi** on chain id **296**.
 ```bash
 yarn next:dev
 yarn next:test            # Vitest: policy, swap encoding, receipt verification, rate limiter
-yarn hardhat:test:guard   # Hardhat, in-memory chain: TreasuryPolicyGuard
+yarn hardhat:test:guard   # Hardhat, in-memory chain: TreasuryPolicyGuard + approval lane
 yarn next:build
 yarn lint
 yarn hardhat:deploy --network hederaTestnet --tags TreasuryPolicyGuard
@@ -83,7 +83,8 @@ yarn e2e:synpress         # Synpress + MetaMask when configured
 | Path | Why |
 | --- | --- |
 | `packages/hardhat/contracts/TreasuryPolicyGuard.sol` | Policy that holds the money |
-| `packages/hardhat/test/TreasuryPolicyGuard.test.ts` | Contract behaviour |
+| `packages/hardhat/test/TreasuryPolicyGuard.test.ts` | Direct-lane contract behaviour |
+| `packages/hardhat/test/TreasuryApprovalLane.test.ts` | Propose / approve / veto / execute |
 | `packages/hardhat/deploy/03_deploy_treasury_policy_guard.ts` | Starter policy and env vars |
 | `packages/nextjs/components/saucerswap/TreasuryGuardCard.tsx` | Guard panel |
 | `packages/nextjs/components/saucerswap/SwapCard.tsx` | UI-mode swap |
@@ -100,6 +101,10 @@ yarn e2e:synpress         # Synpress + MetaMask when configured
 - **Add an output token:** `setTokenRule(token, true, minOutPerHbar)` from the admin account, associate the payout account with the token, probe QuoterV2 for the fee tier, add it to `DEFAULT_SWAP_POLICY.allowedTokenOut`, add tests.
 - **Change a limit:** edit the deploy defaults and `DEFAULT_SWAP_POLICY`, update both test files and the README table.
 - **Add a role or rule:** add a custom error, a test for the revert, an entry in `guardAbi.ts` and `describeGuardError`.
+
+## Approval lane
+
+Swaps above `approvalPolicy.threshold` revert with `ApprovalRequired` on the direct path. The flow is `proposeSwap` (executor) -> `approveSwap` (approver, never the proposer) -> `executeSwap` (executor, re-supplies the path, which must match the committed hash). The policy is checked at proposal time and again at execution. A guardian or the admin can `vetoSwap` at any time, even while paused. The browser policy in `policy.ts` does not model approvals; the contract is the only authority for them.
 
 ## Gotchas
 

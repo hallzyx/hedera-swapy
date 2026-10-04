@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { type Address, BaseError, ContractFunctionRevertedError, type Hex, formatUnits } from "viem";
 import { useAccount, useBalance, usePublicClient, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { GuardProposals } from "~~/components/saucerswap/GuardProposals";
 import {
   SAUCERSWAP_TESTNET,
   applySlippage,
@@ -73,6 +74,7 @@ const GuardPanel = ({ guard, amount, slippageBps }: TreasuryGuardCardProps & { g
       { ...base, functionName: "remainingToday" },
       { ...base, functionName: "EXECUTOR_ROLE" },
       { ...base, functionName: "tokenRules", args: [SAUCERSWAP_TESTNET.sauce] },
+      { ...base, functionName: "approvalPolicy" },
     ],
     query: { refetchInterval: 15_000 },
   });
@@ -82,6 +84,7 @@ const GuardPanel = ({ guard, amount, slippageBps }: TreasuryGuardCardProps & { g
   const remainingToday = policyData?.[2]?.result as bigint | undefined;
   const executorRole = policyData?.[3]?.result as Hex | undefined;
   const sauceRule = policyData?.[4]?.result as readonly [boolean, bigint] | undefined;
+  const approvalPolicy = policyData?.[5]?.result as readonly [bigint, number] | undefined;
 
   const { data: walletData } = useReadContracts({
     contracts: [
@@ -95,6 +98,14 @@ const GuardPanel = ({ guard, amount, slippageBps }: TreasuryGuardCardProps & { g
 
   // Hashio reports balances in 18-decimal weibars; the contract itself works in tinybars.
   const { data: balance } = useBalance({ address: guard, chainId: SAUCERSWAP_TESTNET.chainId });
+
+  const needsApprovalForAmount = useMemo(() => {
+    try {
+      return approvalPolicy !== undefined && parseHbarToTinybars(amount) > approvalPolicy[0];
+    } catch {
+      return false;
+    }
+  }, [amount, approvalPolicy]);
 
   const onWrongNetwork = isConnected && chainId !== SAUCERSWAP_TESTNET.chainId;
   const canSwap =
@@ -120,14 +131,25 @@ const GuardPanel = ({ guard, amount, slippageBps }: TreasuryGuardCardProps & { g
         );
         return;
       }
-      const deadline = BigInt(Math.floor(Date.now() / 1000) + 20 * 60);
-      const args = [quote.path, address, tinybars, minOut, deadline] as const;
+      // Above the direct limit the contract only accepts a proposal that a second person approves.
+      const needsApproval = approvalPolicy !== undefined && tinybars > approvalPolicy[0];
+      const call = needsApproval
+        ? ({ ...base, functionName: "proposeSwap", args: [quote.path, address, tinybars, minOut] } as const)
+        : ({
+            ...base,
+            functionName: "swapHbarForToken",
+            args: [quote.path, address, tinybars, minOut, BigInt(Math.floor(Date.now() / 1000) + 20 * 60)],
+          } as const);
 
       // Dry-run first so a rejection is explained before the wallet prompt.
-      await publicClient.simulateContract({ ...base, functionName: "swapHbarForToken", args, account: address });
-      const hash = await writeContractAsync({ ...base, functionName: "swapHbarForToken", args, gas: 2_000_000n });
+      await publicClient.simulateContract({ ...call, account: address });
+      const hash = await writeContractAsync({ ...call, gas: 2_000_000n });
       setTxHash(hash);
-      setStatus("Swap submitted through the treasury guard. Waiting for confirmation…");
+      setStatus(
+        needsApproval
+          ? "Proposal submitted. A second approver has to sign it before it can execute."
+          : "Swap submitted through the treasury guard. Waiting for confirmation…",
+      );
     } catch (error) {
       setStatus(explain(error));
     }
@@ -158,6 +180,14 @@ const GuardPanel = ({ guard, amount, slippageBps }: TreasuryGuardCardProps & { g
         <dd className="m-0 text-right font-medium">
           {sauceRule ? (sauceRule[0] ? `${formatSauce(sauceRule[1])} SAUCE per HBAR` : "token not allowed") : "—"}
         </dd>
+        <dt className="text-base-content/60">Second signer needed above</dt>
+        <dd className="m-0 text-right font-medium">
+          {approvalPolicy && limits
+            ? approvalPolicy[0] >= limits[1]
+              ? "off"
+              : `${formatTinybars(approvalPolicy[0])} HBAR · ${approvalPolicy[1]} approval(s)`
+            : "—"}
+        </dd>
         <dt className="text-base-content/60">Status</dt>
         <dd className="m-0 text-right font-medium">{paused === undefined ? "—" : paused ? "Paused" : "Active"}</dd>
         <dt className="text-base-content/60">Your wallet</dt>
@@ -175,8 +205,10 @@ const GuardPanel = ({ guard, amount, slippageBps }: TreasuryGuardCardProps & { g
         disabled={!canSwap}
         onClick={() => void handleSwap()}
       >
-        {isPending || isConfirming ? "Confirming…" : "Swap through the guard"}
+        {isPending || isConfirming ? "Confirming…" : needsApprovalForAmount ? "Propose swap for approval" : "Swap through the guard"}
       </button>
+
+      <GuardProposals guard={guard} required={approvalPolicy?.[1] ?? 1} />
 
       {onWrongNetwork && (
         <div className="alert alert-error text-sm mt-3">
