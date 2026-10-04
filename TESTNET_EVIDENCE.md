@@ -19,6 +19,7 @@ Fee tiers 500 and 10000 reverted; **3000** is the live tier for this pair on tes
 | --- | --- |
 | Guard contract | [`0xd60fcEEb775d0E034a6013e5a743BFa0B6046870`](https://hashscan.io/testnet/contract/0xd60fcEEb775d0E034a6013e5a743BFa0B6046870) |
 | Deploy transaction | [`0x8081244e...f6239f`](https://hashscan.io/testnet/transaction/0x8081244e8a7311d876d99b9826de4aea45abf21e921e22284df5ef9446f6239f) (2,282,774 gas) |
+| Sourcify | [exact match (runtime)](https://repo.sourcify.dev/296/0xd60fcEEb775d0E034a6013e5a743BFa0B6046870), verified 2026-10-04 |
 | Policy at deploy | 0.1 to 50 HBAR per swap, 100 HBAR per UTC day, SAUCE floor 30 SAUCE per HBAR, swaps above 10 HBAR need 1 approval |
 | Executor, guardian, admin, payout | `0x6F21C2155bF93b49348a422A604310F8CCd6ec74` |
 | Approver | `0xb9BA204Ef638ecA64c9C8DC975baA9E3f4a4Bf89` |
