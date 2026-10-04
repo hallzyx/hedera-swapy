@@ -72,14 +72,23 @@ export const GuardProposals = ({ guard, required }: { guard: Address; required: 
     try {
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 20 * 60);
       const path = encodeV2Path(SAUCERSWAP_TESTNET.whbar, SAUCERSWAP_TESTNET.poolFee, SAUCERSWAP_TESTNET.sauce);
-      const call =
-        action === "executeSwap"
-          ? ({ ...base, functionName: "executeSwap", args: [id, path, deadline] } as const)
-          : ({ ...base, functionName: action, args: [id] } as const);
-
       // Dry-run first so a rejection is explained before the wallet prompt.
-      await publicClient.simulateContract({ ...call, account: address });
-      const hash = await writeContractAsync({ ...call, gas: 2_000_000n });
+      const submit = async () => {
+        if (action === "executeSwap") {
+          const call = { ...base, functionName: "executeSwap", args: [id, path, deadline] } as const;
+          await publicClient.simulateContract({ ...call, account: address });
+          return writeContractAsync({ ...call, gas: 2_000_000n });
+        }
+        if (action === "approveSwap") {
+          const call = { ...base, functionName: "approveSwap", args: [id] } as const;
+          await publicClient.simulateContract({ ...call, account: address });
+          return writeContractAsync({ ...call, gas: 2_000_000n });
+        }
+        const call = { ...base, functionName: "vetoSwap", args: [id] } as const;
+        await publicClient.simulateContract({ ...call, account: address });
+        return writeContractAsync({ ...call, gas: 2_000_000n });
+      };
+      const hash = await submit();
       setTxHash(hash);
       setMessage("Submitted. The list refreshes once the transaction is confirmed.");
       const receipt = await publicClient.waitForTransactionReceipt({ hash });

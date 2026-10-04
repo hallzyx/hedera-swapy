@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type Address, BaseError, ContractFunctionRevertedError, type Hex, formatUnits } from "viem";
-import { useAccount, useBalance, usePublicClient, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import {
+  useAccount,
+  useBalance,
+  usePublicClient,
+  useReadContracts,
+  useWaitForTransactionReceipt,
+  useWriteContract,
+} from "wagmi";
 import { GuardProposals } from "~~/components/saucerswap/GuardProposals";
 import {
   SAUCERSWAP_TESTNET,
@@ -143,17 +150,22 @@ const GuardPanel = ({ guard, amount, slippageBps }: TreasuryGuardCardProps & { g
       }
       // Above the direct limit the contract only accepts a proposal that a second person approves.
       const needsApproval = approvalPolicy !== undefined && tinybars > approvalPolicy[0];
-      const call = needsApproval
-        ? ({ ...base, functionName: "proposeSwap", args: [quote.path, address, tinybars, minOut] } as const)
-        : ({
-            ...base,
-            functionName: "swapHbarForToken",
-            args: [quote.path, address, tinybars, minOut, BigInt(Math.floor(Date.now() / 1000) + 20 * 60)],
-          } as const);
-
       // Dry-run first so a rejection is explained before the wallet prompt.
-      await publicClient.simulateContract({ ...call, account: address });
-      const hash = await writeContractAsync({ ...call, gas: 2_000_000n });
+      const submit = async () => {
+        if (needsApproval) {
+          const call = { ...base, functionName: "proposeSwap", args: [quote.path, address, tinybars, minOut] } as const;
+          await publicClient.simulateContract({ ...call, account: address });
+          return writeContractAsync({ ...call, gas: 2_000_000n });
+        }
+        const call = {
+          ...base,
+          functionName: "swapHbarForToken",
+          args: [quote.path, address, tinybars, minOut, BigInt(Math.floor(Date.now() / 1000) + 20 * 60)],
+        } as const;
+        await publicClient.simulateContract({ ...call, account: address });
+        return writeContractAsync({ ...call, gas: 2_000_000n });
+      };
+      const hash = await submit();
       swapHash.current = needsApproval ? null : hash;
       setTxHash(hash);
       setStatus(
@@ -216,7 +228,11 @@ const GuardPanel = ({ guard, amount, slippageBps }: TreasuryGuardCardProps & { g
         disabled={!canSwap}
         onClick={() => void handleSwap()}
       >
-        {isPending || isConfirming ? "Confirming…" : needsApprovalForAmount ? "Propose swap for approval" : "Swap through the guard"}
+        {isPending || isConfirming
+          ? "Confirming…"
+          : needsApprovalForAmount
+            ? "Propose swap for approval"
+            : "Swap through the guard"}
       </button>
 
       <GuardProposals guard={guard} required={approvalPolicy?.[1] ?? 1} />
