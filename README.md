@@ -219,7 +219,7 @@ yarn e2e:policy   # Playwright UI checks (no MetaMask)
 
 ## Testnet evidence
 
-## Treasury guard on Hedera testnet (`yarn demo:guard`, 2026-10-04)
+### Treasury guard on Hedera testnet (`yarn demo:guard`, 2026-10-04)
 
 | Field | Value |
 | --- | --- |
