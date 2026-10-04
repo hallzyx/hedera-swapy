@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { NextPage } from "next";
 import { AuditTrail } from "~~/components/saucerswap/AuditTrail";
 import { IntentForm } from "~~/components/saucerswap/IntentForm";
+import { SetupChecklist } from "~~/components/saucerswap/SetupChecklist";
 import { SwapCard } from "~~/components/saucerswap/SwapCard";
 import { TreasuryGuardCard } from "~~/components/saucerswap/TreasuryGuardCard";
 import { DEFAULT_SWAP_POLICY, SAUCERSWAP_TESTNET, formatTinybars } from "~~/utils/saucerswap";
@@ -28,6 +29,8 @@ const Home: NextPage = () => {
       </div>
 
       <div className="w-full max-w-4xl mx-auto px-5 -mt-8 pb-16 flex flex-col gap-6">
+        <SetupChecklist />
+
         <SwapCard
           amount={amount}
           slippageBps={slippageBps}

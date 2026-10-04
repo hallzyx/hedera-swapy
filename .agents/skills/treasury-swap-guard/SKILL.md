@@ -18,9 +18,9 @@ A DAO or team treasury holds HBAR in `TreasuryPolicyGuard`, which can only spend
 
 | Task | Edit | Also update |
 | --- | --- | --- |
-| Change per-swap or daily limits | `deploy/03_deploy_treasury_policy_guard.ts`, `DEFAULT_SWAP_POLICY` in `utils/saucerswap/policy.ts` | `policy.test.ts`, `TreasuryPolicyGuard.test.ts`, README policy table |
-| Add an output token | `setTokenRule` call in the deploy script, `allowedTokenOut` in `policy.ts` | associate the payout account (HTS), probe QuoterV2 fee tier, tests |
-| Change the price floor | `TREASURY_MIN_SAUCE_PER_HBAR` default in the deploy script | README table; floor is SAUCE units per 1 HBAR |
+| Change per-swap or daily limits, approval threshold, slippage cap | `treasury.config.json` (repo root; deploy script and `policy.ts` both read it) | `treasuryConfig.test.ts`, `TreasuryPolicyGuard.test.ts` fixture, README policy table |
+| Add an output token | `tokens` in `treasury.config.json` (the deploy script calls `setTokenRule`; `policy.ts` allows it) | associate the payout account (HTS), probe QuoterV2 fee tier, tests; the swap card quotes WHBAR/SAUCE only |
+| Change the price floor | `minOutPerHbar` of the token in `treasury.config.json` (env `TREASURY_MIN_SAUCE_PER_HBAR` overrides SAUCE at deploy) | README table; floor is SAUCE units per 1 HBAR |
 | Add or change a contract rule | `contracts/TreasuryPolicyGuard.sol` (custom error + small private function) | `guardAbi.ts` (error entry + `describeGuardError`), a revert test |
 | Change the approval lane (threshold, quorum, TTL, veto) | `TreasuryPolicyGuard.sol` (`approvalPolicy`, `PROPOSAL_TTL`, propose/approve/veto/execute) | `TreasuryApprovalLane.test.ts`, `guardAbi.ts`, `GuardProposals.tsx`, SECURITY.md |
 | Add a role | `TreasuryPolicyGuard.sol` constant + `onlyRole` | deploy script env var, `SECURITY.md` role table, role check in `GuardProposals.tsx` if the UI shows it |
@@ -33,6 +33,8 @@ A DAO or team treasury holds HBAR in `TreasuryPolicyGuard`, which can only spend
 | Audit panel | `components/saucerswap/AuditTrail.tsx` | `GET` in `receipts/route.ts` |
 | HTS association | `utils/saucerswap/association.ts` | mirror node is the source of truth |
 | Addresses / fee tier | `utils/saucerswap/addresses.ts` | the deploy script derives the same IDs; re-probe QuoterV2 before changing the pair |
+| First-run checklist in the UI | `utils/saucerswap/checklist.ts` (pure logic) and `components/saucerswap/SetupChecklist.tsx` | `checklist.test.ts`, `e2e/policy.spec.ts` |
+| `yarn doctor` diagnostics | `packages/nextjs/scripts/doctor.mjs` | keep it read-only; mirror new rules or env vars here |
 | Deploy, starter roles, env vars | `deploy/03_deploy_treasury_policy_guard.ts` | README env table, `.env.example` |
 | Evidence for the submission | `yarn demo:guard` | paste its table into README "Testnet evidence" |
 | Docs | `README.md`, `SECURITY.md`, `ARCHITECTURE.md`, `AGENTS.md`, `template.json` | keep policy values identical everywhere |
@@ -60,6 +62,7 @@ yarn hardhat:test:guard     # contract tests, in-memory chain
 yarn next:test              # policy, swap encoding, receipts, rate limiter
 yarn lint && yarn next:check-types
 yarn next:build
+yarn doctor                 # read-only setup diagnostics against testnet
 yarn skills:check           # after editing this skill, run yarn skills:sync first
 ```
 

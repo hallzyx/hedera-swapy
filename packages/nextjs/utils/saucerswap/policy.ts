@@ -1,4 +1,6 @@
-import { SAUCERSWAP_TESTNET } from "./addresses";
+import { hederaNumToAddress } from "./addresses";
+import { parseHbarToTinybars } from "./amounts";
+import { TREASURY_CONFIG, tokenIdToNum } from "./treasuryConfig";
 import type { Address } from "viem";
 
 export type SwapPolicyInput = {
@@ -25,12 +27,14 @@ export type SwapPolicyLimits = {
   allowedTokenOut: ReadonlySet<string>;
 };
 
-/** Defaults for the template demo — keep amounts small for testnet. */
+/** Defaults come from `treasury.config.json`, the same file the deploy script reads. */
 export const DEFAULT_SWAP_POLICY: SwapPolicyLimits = {
-  minAmountTinybars: 10_000_000n, // 0.1 HBAR
-  maxAmountTinybars: 5_000_000_000n, // 50 HBAR
-  maxSlippageBps: 500, // 5%
-  allowedTokenOut: new Set([SAUCERSWAP_TESTNET.sauce.toLowerCase()]),
+  minAmountTinybars: parseHbarToTinybars(TREASURY_CONFIG.limits.minHbarPerSwap),
+  maxAmountTinybars: parseHbarToTinybars(TREASURY_CONFIG.limits.maxHbarPerSwap),
+  maxSlippageBps: TREASURY_CONFIG.browser.maxSlippageBps,
+  allowedTokenOut: new Set(
+    TREASURY_CONFIG.tokens.map(token => hederaNumToAddress(tokenIdToNum(token.tokenId)).toLowerCase()),
+  ),
 };
 
 /**

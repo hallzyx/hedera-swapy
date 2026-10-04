@@ -56,6 +56,14 @@ Open [http://localhost:3000](http://localhost:3000).
 - A Hedera **testnet** account with HBAR from the [Hedera Portal faucet](https://portal.hedera.com/faucet)
 - MetaMask (or another RainbowKit wallet) on **Hedera Testnet** (chain id `296`)
 
+## Check your setup
+
+```bash
+yarn doctor
+```
+
+Read-only. It checks Node, `treasury.config.json`, your env files, the Hedera testnet RPC and mirror node, and, when a guard address is set, the deployed contract (limits, approval lane, price floors, balance, pause). Pass `SWAP_PRIVATE_KEY` (and optionally `APPROVER_PRIVATE_KEY`, `TREASURY_PAYOUT_ADDRESS`) to also check roles, the payout allowlist and token association. Every problem comes with the command that fixes it. The web app shows the same first-run steps in its **Setup checklist** card.
+
 ## Mode 1: UI only (no deploy)
 
 ```bash
@@ -95,6 +103,10 @@ Starter policy applied by the script (change it with the admin account at any ti
 
 To split roles, set `TREASURY_ADMIN` (for example a multisig) and `TREASURY_EXECUTOR` before deploying. When the admin is not the deployer the script only deploys and prints the three admin calls to make.
 
+### One config file for the policy
+
+`treasury.config.json` (repository root) holds the starter policy: per-swap and daily limits, the approval threshold and quorum, the browser slippage cap and the allowed output tokens with their price floors. The deploy script, the browser pre-flight policy (`policy.ts`), the UI checklist and `yarn doctor` all read it, and `treasuryConfig.test.ts` fails if it becomes inconsistent. To adapt the template, edit that file; use the admin setters on an already deployed guard. Adding a token to the config updates the allowlist, but the swap card still quotes WHBAR/SAUCE only (see `AGENTS.md`).
+
 ### Contract tests
 
 ```bash
@@ -114,7 +126,11 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the flows and [SECURITY.md](SECURITY.
 | `packages/hardhat/contracts/mocks/MockSaucerSwapRouter.sol` | Test-only router |
 | `packages/hardhat/deploy/03_deploy_treasury_policy_guard.ts` | Deploy + starter policy |
 | `packages/nextjs/utils/saucerswap/quote.ts` | `eth_call` to QuoterV2 `quoteExactInput` |
+| `treasury.config.json` | Policy defaults shared by deploy, browser policy, UI and `yarn doctor` |
 | `packages/nextjs/utils/saucerswap/policy.ts` | Pure browser policy |
+| `packages/nextjs/utils/saucerswap/checklist.ts` | Pure first-run checklist logic |
+| `packages/nextjs/components/saucerswap/SetupChecklist.tsx` | First-run checklist card |
+| `packages/nextjs/scripts/doctor.mjs` | `yarn doctor` diagnostics |
 | `packages/nextjs/utils/saucerswap/association.ts` | Mirror-node association check + HTS associate calldata |
 | `packages/nextjs/utils/saucerswap/swap.ts` | Encode `exactInput` + `refundETH` multicall (UI mode) |
 | `packages/nextjs/utils/saucerswap/guardAbi.ts` | Guard ABI + readable revert reasons |

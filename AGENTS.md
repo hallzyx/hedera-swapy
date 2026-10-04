@@ -40,7 +40,7 @@ Before changing anything, load the project skill `treasury-swap-guard` (`.agents
 | Contract (authority) | `packages/hardhat/contracts/TreasuryPolicyGuard.sol` | Holds funds, rejects anything outside policy |
 | Browser (pre-flight) | `packages/nextjs/utils/saucerswap/policy.ts` | Fast feedback; used alone in "UI mode" |
 
-If you change a rule in one, update the other, its tests (`policy.test.ts`, `TreasuryPolicyGuard.test.ts`), `deploy/03_deploy_treasury_policy_guard.ts` defaults and the README policy table. Never arm a swap button when the relevant policy says no.
+Limits, the approval threshold and the allowed tokens live in `treasury.config.json` at the repository root; the deploy script and `policy.ts` both read it, so edit the numbers there once. If you change a rule's logic in one layer, update the other, its tests (`policy.test.ts`, `TreasuryPolicyGuard.test.ts`), `treasury.config.json` and the README policy table. Never arm a swap button when the relevant policy says no.
 
 ## Fixed testnet pair
 
@@ -79,6 +79,7 @@ yarn hardhat:test:guard   # Hardhat, in-memory chain: TreasuryPolicyGuard + appr
 yarn next:build
 yarn lint
 yarn hardhat:deploy --network hederaTestnet --tags TreasuryPolicyGuard
+yarn doctor               # read-only setup diagnostics (env, guard, roles, association)
 yarn skills:sync          # mirror .agents/skills into .claude/skills (CI: yarn skills:check)
 yarn demo:swap            # needs SWAP_PRIVATE_KEY (UI-mode swap, no guard)
 yarn demo:guard           # needs TREASURY_GUARD_ADDRESS + SWAP_PRIVATE_KEY (+ APPROVER_PRIVATE_KEY): evidence table
@@ -100,6 +101,9 @@ yarn e2e:synpress         # Synpress + MetaMask when configured
 | `packages/nextjs/components/saucerswap/SwapCard.tsx` | UI-mode swap |
 | `packages/nextjs/utils/saucerswap/*` | Addresses, policy, quote, swap, ABI, receipt verification |
 | `packages/nextjs/app/api/receipts/route.ts` | HCS receipt writer |
+| `treasury.config.json` | Policy defaults (limits, approval, tokens) |
+| `packages/nextjs/scripts/doctor.mjs` | `yarn doctor` |
+| `packages/nextjs/components/saucerswap/SetupChecklist.tsx` | First-run checklist |
 | `template.json` | scaffold-hbar capabilities |
 
 ## Receipts
@@ -108,8 +112,8 @@ yarn e2e:synpress         # Synpress + MetaMask when configured
 
 ## Recipes
 
-- **Add an output token:** `setTokenRule(token, true, minOutPerHbar)` from the admin account, associate the payout account with the token, probe QuoterV2 for the fee tier, add it to `DEFAULT_SWAP_POLICY.allowedTokenOut`, add tests.
-- **Change a limit:** edit the deploy defaults and `DEFAULT_SWAP_POLICY`, update both test files and the README table.
+- **Add an output token:** add it to `tokens` in `treasury.config.json` (the deploy script calls `setTokenRule`, `policy.ts` allows it), or call `setTokenRule(token, true, minOutPerHbar)` from the admin on a deployed guard; associate the payout account, probe QuoterV2 for the fee tier, add tests. The swap card quotes WHBAR/SAUCE only.
+- **Change a limit:** edit `treasury.config.json`, run `yarn next:test`, update the contract fixture in `TreasuryPolicyGuard.test.ts` if it depends on the old value, and the README table.
 - **Add a role or rule:** add a custom error, a test for the revert, an entry in `guardAbi.ts` and `describeGuardError`.
 
 ## Approval lane

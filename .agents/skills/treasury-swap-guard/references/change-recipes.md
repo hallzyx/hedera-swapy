@@ -1,16 +1,16 @@
 # Change recipes
 
 ## Add an output token
-1. Admin calls `setTokenRule(token, true, minOutPerHbar)` (or add it to the deploy script).
+1. Add it to `tokens` in `treasury.config.json` (the deploy script calls `setTokenRule`), or call `setTokenRule(token, true, minOutPerHbar)` as admin on a deployed guard.
 2. Associate the payout account with the token (HTS).
 3. Probe QuoterV2 for the live fee tier; do not guess it.
-4. Add the address to `DEFAULT_SWAP_POLICY.allowedTokenOut` in `policy.ts` and to `addresses.ts`.
+4. `policy.ts` already allows every token in the config; add the address to `addresses.ts` only if the UI needs to quote it.
 5. Tests: `policy.test.ts` (allowed / not allowed), a contract test with the new token.
 6. Update the README policy table.
 
 ## Change a limit
-1. Deploy script defaults and `DEFAULT_SWAP_POLICY` (same numbers; contract uses tinybars).
-2. `policy.test.ts` and `TreasuryPolicyGuard.test.ts` (fixture limits if they depend on it).
+1. Edit `treasury.config.json` (HBAR decimal strings). The deploy script and `policy.ts` read it, so there is one place to change.
+2. `treasuryConfig.test.ts` validates it; `TreasuryPolicyGuard.test.ts` has its own fixture limits, update them if they depend on it. On an already deployed guard, call `setLimits` as admin.
 3. README policy table and `SECURITY.md` if the daily-cap wording changes.
 
 ## Add a contract rule

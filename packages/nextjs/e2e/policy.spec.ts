@@ -28,6 +28,13 @@ test.describe("policy-gated swap UI", () => {
     await expect(page.getByTestId("guard-setup")).toContainText("TreasuryPolicyGuard");
   });
 
+  test("setup checklist tells a first-time visitor what is missing", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("setup-checklist")).toBeVisible();
+    await expect(page.getByTestId("check-wallet")).toHaveAttribute("data-status", "todo");
+    await expect(page.getByTestId("check-guard")).toHaveAttribute("data-status", "todo");
+  });
+
   test("intent form fills the swap amount", async ({ page }) => {
     await page.goto("/");
     await page.getByTestId("intent-input").fill("swap 2 HBAR to SAUCE slippage 150 bps");
