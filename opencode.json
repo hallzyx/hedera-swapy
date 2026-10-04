@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "hedera-docs": {
+      "type": "remote",
+      "url": "https://docs.hedera.com/mcp",
+      "enabled": true
+    }
+  }
+}

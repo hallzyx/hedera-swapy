@@ -39,6 +39,10 @@ A DAO or team treasury holds HBAR in `TreasuryPolicyGuard`, which can only spend
 
 Paths above are relative to `packages/nextjs/` for `utils/`, `components/`, `app/` and `e2e/`, and to `packages/hardhat/` for `contracts/`, `deploy/` and `test/`.
 
+## Hedera facts: use the docs MCP
+
+The repo registers the read-only Hedera docs MCP server (`hedera-docs`, tool `SearchHedera`) for each agent. Use it, instead of memory, for Hedera behaviour this repo depends on: HTS precompile and association, HSS, HCS, mirror node fields, JSON-RPC relay and gas. If the tool is not available, search `https://docs.hedera.com`. Do not use the Hedera network (transaction-building) MCP here; it needs a wallet and is out of scope.
+
 ## Do not
 
 - Hardcode addresses outside `addresses.ts` or the deploy script.

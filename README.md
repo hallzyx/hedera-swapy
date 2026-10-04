@@ -174,7 +174,7 @@ The rate limiter and duplicate set live in process memory; use a shared store if
 
 ## For coding agents
 
-The repo ships an agent skill, `treasury-swap-guard`, that tells Claude Code, Cursor, Codex or OpenCode which files to touch for each kind of change. `AGENTS.md` points every agent at it at the start of a session. The canonical copy lives in `.agents/skills/`; `yarn skills:sync` mirrors it to `.claude/skills/`.
+The repo ships an agent skill, `treasury-swap-guard`, that tells Claude Code, Cursor, Codex or OpenCode which files to touch for each kind of change. `AGENTS.md` points every agent at it at the start of a session. The canonical copy lives in `.agents/skills/`; `yarn skills:sync` mirrors it to `.claude/skills/`. The same agents also get the read-only [Hedera docs MCP server](https://docs.hedera.com/learn/getting-started/mcp-setup) through `.mcp.json`, `.cursor/mcp.json`, `opencode.json` and `.codex/config.toml`.
 
 ## Adapting it to your treasury
 

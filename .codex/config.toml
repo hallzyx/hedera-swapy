@@ -1,0 +1,3 @@
+# Read-only Hedera documentation search (tool: SearchHedera). No keys, no wallet.
+[mcp_servers.hedera-docs]
+url = "https://docs.hedera.com/mcp"

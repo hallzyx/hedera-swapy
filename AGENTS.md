@@ -29,6 +29,10 @@ Target user: a treasurer or ops lead of a DAO or small team converting treasury 
 
 Before changing anything, load the project skill `treasury-swap-guard` (`.agents/skills/treasury-swap-guard/SKILL.md`). It maps each kind of change (limits, tokens, roles, approval lane, UI, receipts, deploy, docs) to the files, tests and checks involved, with recipes and invariants in `references/`. Cursor, Codex and OpenCode read `.agents/skills/`; Claude Code reads the mirror in `.claude/skills/`. Edit the skill under `.agents/skills/`, then run `yarn skills:sync`; CI runs `yarn skills:check`.
 
+## Hedera docs MCP
+
+`.mcp.json` (Claude Code), `.cursor/mcp.json` (Cursor), `opencode.json` (OpenCode) and `.codex/config.toml` (Codex) register `https://docs.hedera.com/mcp`, a read-only search tool (`SearchHedera`) that needs no keys. Prefer it over memory for Hedera facts. Claude Code asks you to approve project servers once; Codex only loads project config in trusted projects. The Hedera network MCP (it builds transactions for a wallet to sign) is not configured and stays out of scope.
+
 ## Two policy layers (keep them in sync)
 
 | Layer | File | Role |
