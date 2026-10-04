@@ -3,15 +3,42 @@
   "description": "DAO and team treasury swaps on SaucerSwap V2 (Hedera testnet) with an on-chain policy guard, roles, pause and HCS receipts",
   "create-scaffold-hbar": {
     "capabilities": {
-      "frontend": ["nextjs-app"],
-      "solidityFramework": ["hardhat"],
-      "packageManager": ["yarn"]
+      "frontend": [
+        "nextjs-app"
+      ],
+      "solidityFramework": [
+        "hardhat"
+      ],
+      "packageManager": [
+        "yarn"
+      ]
     },
     "defaults": {
       "frontend": "nextjs-app",
       "solidityFramework": "hardhat",
       "packageManager": "yarn"
     },
-    "outro": "UI mode needs no deploy: fund a Hedera testnet wallet, run yarn next:dev, associate SAUCE and swap. Treasury mode: yarn hardhat:deploy --network hederaTestnet --tags TreasuryPolicyGuard, fund the printed address and set NEXT_PUBLIC_TREASURY_GUARD_ADDRESS."
+    "outro": {
+      "sections": [
+        {
+          "title": "Treasury swap guard",
+          "steps": [
+            {
+              "label": "UI mode (no deploy)",
+              "text": "Fund a Hedera testnet wallet, associate SAUCE and swap.",
+              "command": "yarn next:dev"
+            },
+            {
+              "label": "Treasury mode: deploy the guard",
+              "command": "yarn hardhat:deploy --network hederaTestnet --tags TreasuryPolicyGuard"
+            },
+            {
+              "label": "Then",
+              "text": "Fund the printed guard address with testnet HBAR and set NEXT_PUBLIC_TREASURY_GUARD_ADDRESS in packages/nextjs/.env.local."
+            }
+          ]
+        }
+      ]
+    }
   }
 }
