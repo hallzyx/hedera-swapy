@@ -229,6 +229,10 @@ export const SwapCard = ({ amount, slippageBps, onAmountChange, onSlippageChange
           Swap HBAR → SAUCE on Hedera testnet through SaucerSwap V2. A TypeScript policy decides whether the swap button
           can be armed.
         </p>
+        <p className="text-sm text-base-content/70 m-0">
+          Swap with your own wallet&apos;s HBAR (no treasury). This card&apos;s amount and slippage also feed the
+          Treasury guard card below.
+        </p>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -291,7 +295,9 @@ export const SwapCard = ({ amount, slippageBps, onAmountChange, onSlippageChange
           </div>
         ) : (
           <div className="alert alert-success text-sm" data-testid="policy-accept">
-            <span>Policy accepted. Connect a Hedera testnet wallet and swap.</span>
+            <span>
+              {isConnected ? "Policy accepted." : "Policy accepted. Connect a Hedera testnet wallet and swap."}
+            </span>
           </div>
         )}
 
@@ -332,7 +338,7 @@ export const SwapCard = ({ amount, slippageBps, onAmountChange, onSlippageChange
               ? "Confirming…"
               : !policy.ok
                 ? "Blocked by policy"
-                : "Swap HBAR → SAUCE"}
+                : "Swap with my wallet (no guard)"}
         </button>
 
         {(status || lastTxHash) && (

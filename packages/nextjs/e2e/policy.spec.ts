@@ -19,7 +19,7 @@ test.describe("policy-gated swap UI", () => {
     await expect(page.getByTestId("quote-out")).not.toHaveText("—", { timeout: 20_000 });
 
     // Without a connected wallet the CTA stays disabled but is no longer "Blocked by policy".
-    await expect(page.getByTestId("swap-submit")).toContainText(/Connect wallet|Swap HBAR/);
+    await expect(page.getByTestId("swap-submit")).toContainText(/Connect wallet|Swap with my wallet/);
   });
 
   test("guard panel explains how to deploy when no address is configured", async ({ page }) => {

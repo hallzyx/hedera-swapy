@@ -225,9 +225,10 @@ const GuardPanel = ({ guard, amount, slippageBps }: TreasuryGuardCardProps & { g
         </dd>
       </dl>
 
+      <p className="text-xs text-base-content/60 mt-5 mb-0">Uses the treasury&apos;s HBAR, not your wallet&apos;s.</p>
       <button
         type="button"
-        className="btn btn-primary w-full mt-5"
+        className="btn btn-primary w-full mt-2"
         data-testid="guard-swap-submit"
         disabled={!canSwap}
         onClick={() => void handleSwap()}

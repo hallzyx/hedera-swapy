@@ -100,6 +100,13 @@ export const GuardProposals = ({ guard, required }: { guard: Address; required: 
     }
   };
 
+  // Newest first, with live pending proposals (the ones that need action) ahead of the rest.
+  const isLive = (proposal?: ProposalTuple) =>
+    proposal !== undefined && STATUS_LABELS[proposal[4]] === "pending" && proposal[2] * 1000n > BigInt(Date.now());
+  const entries = ids
+    .map((id, index) => ({ id, proposal: proposalData?.[index]?.result as ProposalTuple | undefined }))
+    .sort((a, b) => Number(isLive(b.proposal)) - Number(isLive(a.proposal)));
+
   if (count === 0) {
     return (
       <p className="text-sm text-base-content/60 mt-4 mb-0" data-testid="guard-proposals-empty">
@@ -111,10 +118,9 @@ export const GuardProposals = ({ guard, required }: { guard: Address; required: 
 
   return (
     <div className="mt-5" data-testid="guard-proposals">
-      <h4 className="font-semibold text-sm mb-2 mt-0">Proposals needing a second signer</h4>
+      <h4 className="font-semibold text-sm mb-2 mt-0">Proposals</h4>
       <ul className="list-none p-0 m-0 space-y-2">
-        {ids.map((id, index) => {
-          const proposal = proposalData?.[index]?.result as ProposalTuple | undefined;
+        {entries.map(({ id, proposal }) => {
           if (!proposal) return null;
           const [proposer, , expiresAt, approvals, status, amountIn, amountOutMinimum] = proposal;
           const pending = STATUS_LABELS[status] === "pending" && expiresAt * 1000n > BigInt(Date.now());
