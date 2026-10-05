@@ -231,6 +231,8 @@ yarn e2e:policy   # Playwright UI checks (no MetaMask)
 | Approver | `0xb9BA204Ef638ecA64c9C8DC975baA9E3f4a4Bf89` |
 | Funding | 40 HBAR sent to the guard |
 
+Note: `yarn hardhat:verify:testnet` uses Sourcify's API v1, which has been removed; it returns a 404 and still exits with code 0. The guard above was verified through Sourcify's API v2 instead.
+
 | Step | Result | HashScan |
 | --- | --- | --- |
 | Swap of 1 HBAR inside the policy (direct lane) | success | [tx](https://hashscan.io/testnet/transaction/0xa105143fdb9c048e65717fce36a769281ca0359e60dc5f04865f2bc419282969) |
