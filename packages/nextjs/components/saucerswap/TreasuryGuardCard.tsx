@@ -213,6 +213,10 @@ const GuardPanel = ({ guard, amount, slippageBps }: TreasuryGuardCardProps & { g
         </dd>
         <dt className="text-base-content/60">Status</dt>
         <dd className="m-0 text-right font-medium">{paused === undefined ? "—" : paused ? "Paused" : "Active"}</dd>
+        <dt className="text-base-content/60">Amount to swap</dt>
+        <dd className="m-0 text-right font-medium" data-testid="guard-amount">
+          {amount || "—"} HBAR · {slippageBps} bps slippage (set in the swap card above)
+        </dd>
         <dt className="text-base-content/60">Your wallet</dt>
         <dd className="m-0 text-right font-medium">
           {!isConnected
