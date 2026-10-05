@@ -43,6 +43,7 @@
     "skills:check": "node scripts/sync-skills.mjs --check",
     "doctor": "node packages/nextjs/scripts/doctor.mjs",
     "demo:swap": "node packages/nextjs/scripts/demo-swap.mjs",
+    "hcs:create-topic": "node packages/nextjs/scripts/create-topic.mjs",
     "demo:guard": "node packages/nextjs/scripts/demo-guard.mjs",
     "e2e:policy": "yarn workspace @sh/nextjs e2e:policy",
     "e2e:synpress": "yarn workspace @sh/nextjs e2e:synpress",

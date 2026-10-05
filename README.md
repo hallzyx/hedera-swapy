@@ -186,6 +186,8 @@ If `HCS_OPERATOR_ID`, `HCS_OPERATOR_KEY` and `HCS_TOPIC_ID` are set, the UI post
 2. looks the transaction up on the mirror node and requires `SUCCESS` and a call to the SaucerSwap router or the guard,
 3. writes the **verified** sender, target and amount to the topic (request-body fields are never trusted) and refuses duplicates.
 
+To create the topic, export `HCS_OPERATOR_ID` and `HCS_OPERATOR_KEY` (ECDSA hex) in your shell and run `yarn hcs:create-topic`. It prints `HCS_TOPIC_ID` and never prints the key; only the operator key can submit to that topic.
+
 The rate limiter and duplicate set live in process memory; use a shared store if you run many serverless instances.
 
 ## For coding agents
